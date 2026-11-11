@@ -16,7 +16,9 @@ import { createRun, maxHpOf, type SimState } from './state';
 import { gainScrap, startWave, updateWave } from './waves';
 import { updateWeapons } from './weapons';
 import { onDash, tickEffects } from './effects';
-import { enemyHash, MAX_ENEMY_R, move } from './world';
+import { enemyHash, MAX_ENEMY_R, move, nearestEnemy } from './world';
+import { chance } from '../core/rng';
+import { effectScale } from './effects';
 
 const candidates: number[] = [];
 
@@ -29,7 +31,7 @@ export function startRun(seed: number, ev: EventSink, operator = 'operator'): Si
 
 function dash(s: SimState, inp: TickInput, ev: EventSink): void {
   const p = s.p;
-  if (p.dashCd > 0) return;
+  if (p.dashCharges <= 0) return;
   let x = inp.moveX;
   let y = inp.moveY;
   let len = Math.hypot(x, y);
@@ -37,7 +39,8 @@ function dash(s: SimState, inp: TickInput, ev: EventSink): void {
   p.dx = x / len;
   p.dy = y / len;
   p.dashTime = 0.17;
-  p.dashCd = p.dashMax;
+  p.dashCharges--;
+  if (p.dashCd <= 0) p.dashCd = p.dashMax;
   p.inv = Math.max(p.inv, 0.28);
   ev.push({ t: 'ring', x: p.x, y: p.y, color: PALETTE.cyan, max: 65, life: 0.3 });
   ev.push({ t: 'sfx', id: 'dash' });
@@ -71,7 +74,14 @@ function updatePlayer(s: SimState, inp: TickInput, dt: number, ev: EventSink): v
   if (inp.dash) dash(s, inp, ev);
   if (inp.pulse) pulse(s, ev);
   p.inv = Math.max(0, p.inv - dt);
-  p.dashCd = Math.max(0, p.dashCd - dt);
+  // Заряды рывка восстанавливаются по одному
+  if (p.dashCharges < p.dashMaxCharges) {
+    p.dashCd -= dt;
+    if (p.dashCd <= 0) {
+      p.dashCharges++;
+      p.dashCd = p.dashCharges < p.dashMaxCharges ? p.dashMax : 0;
+    }
+  } else p.dashCd = 0;
   p.lifestealCd = Math.max(0, p.lifestealCd - dt);
   p.energy = Math.min(100, p.energy + dt * 1.7);
   s.comboTime -= dt;
@@ -138,6 +148,16 @@ function updateBullets(s: SimState, dt: number, ev: EventSink): void {
         if (segDistance(b.px, b.py, b.x, b.y, e.x, e.y) < e.r + b.r) {
           b.hit.push(e.id);
           damageEnemy(s, e, b.damage, b.crit, b.weapon, ev);
+          if (b.burnChance && chance(s.rng.combat, b.burnChance / 100)) {
+            e.burn = 3;
+            e.burnDps = Math.max(e.burnDps, 6 * effectScale(s) * s.p.fx.burnMult);
+          }
+          if (b.slowPct) { e.slow = 1.2; e.slowPct = Math.max(e.slowPct, b.slowPct); }
+          if (b.explodeR) {
+            blast(s, b.x, b.y, b.explodeR, b.damage, b.crit, b.weapon, ev);
+            dead = true;
+            break;
+          }
           ev.push({ t: 'burst', x: b.x, y: b.y, color: b.color, n: 2, force: 70 });
           b.pierce--;
           if (b.pierce <= 0) { dead = true; break; }
@@ -153,6 +173,64 @@ function updateBullets(s: SimState, dt: number, ev: EventSink): void {
       s.bullets[i] = s.bullets[s.bullets.length - 1]!;
       s.bullets.pop();
     }
+  }
+}
+
+/** Взрыв оружия оператора (ракета, мина, миномёт): урон всем в радиусе. */
+function blast(s: SimState, x: number, y: number, r: number, dmg: number, crit: boolean, weapon: string, ev: EventSink): void {
+  ev.push({ t: 'ring', x, y, color: '#ff9a5a', max: r, life: 0.3 });
+  ev.push({ t: 'burst', x, y, color: '#ff9a5a', n: 12, force: 240 });
+  ev.push({ t: 'shake', v: 3 });
+  ev.push({ t: 'sfx', id: 'explode' });
+  const hits: number[] = [];
+  enemyHash.queryCircle(x, y, r + MAX_ENEMY_R, (i) => { hits.push(i); });
+  hits.sort((a, b) => a - b);
+  for (const i of hits) {
+    const e = s.enemies[i]!;
+    if (!e.dead && Math.hypot(e.x - x, e.y - y) <= r + e.r) damageEnemy(s, e, dmg, crit, weapon, ev);
+  }
+}
+
+function updateTraps(s: SimState, dt: number, ev: EventSink): void {
+  for (let i = s.traps.length - 1; i >= 0; i--) {
+    const tr = s.traps[i]!;
+    tr.arm -= dt;
+    tr.life -= dt;
+    let go = false;
+    if (tr.artillery) go = tr.arm <= 0;
+    else if (tr.arm <= 0) {
+      enemyHash.queryCircle(tr.x, tr.y, 24 + MAX_ENEMY_R, (j) => {
+        const e = s.enemies[j]!;
+        if (!e.dead && Math.hypot(e.x - tr.x, e.y - tr.y) < e.r + 24) go = true;
+      });
+    }
+    if (go) blast(s, tr.x, tr.y, tr.r, tr.damage, tr.crit, tr.weapon, ev);
+    if (go || tr.life <= 0) s.traps.splice(i, 1);
+  }
+}
+
+function updateTurrets(s: SimState, dt: number, ev: EventSink): void {
+  for (let i = s.turrets.length - 1; i >= 0; i--) {
+    const tu = s.turrets[i]!;
+    tu.life -= dt;
+    tu.cd -= dt;
+    if (tu.life <= 0) {
+      ev.push({ t: 'burst', x: tu.x, y: tu.y, color: PALETTE.cyan, n: 8, force: 120 });
+      s.turrets.splice(i, 1);
+      continue;
+    }
+    const j = nearestEnemy(s, tu.x, tu.y, tu.range);
+    if (j < 0) continue;
+    const e = s.enemies[j]!;
+    tu.aim = Math.atan2(e.y - tu.y, e.x - tu.x);
+    if (tu.cd > 0) continue;
+    tu.cd = tu.rate;
+    const sp = 1100;
+    s.bullets.push({
+      x: tu.x, y: tu.y, px: tu.x, py: tu.y, vx: Math.cos(tu.aim) * sp, vy: Math.sin(tu.aim) * sp, life: tu.range / sp,
+      damage: tu.damage, crit: false, color: PALETTE.cyan, friendly: true, r: 2.5, pierce: 1 + s.p.fx.pierceBonus, hit: [],
+      weapon: 'turret', source: '', explodeR: 0, burnChance: 0, slowPct: 0,
+    });
   }
 }
 
@@ -225,7 +303,9 @@ export function step(s: SimState, inp: TickInput, dt: number, ev: EventSink): vo
   if (s.phase !== 'play') return;
   updateWeapons(s, inp, dt, ev);
   tickEffects(s, dt, ev, damageEnemy);
+  updateTurrets(s, dt, ev);
   updateBullets(s, dt, ev);
+  updateTraps(s, dt, ev);
   updateMines(s, dt, ev);
 
   let w = 0;

@@ -12,6 +12,8 @@ export class Input {
   keys = new Set<string>();
   mouse = { x: innerWidth / 2, y: innerHeight / 2, down: false };
   stick = { x: 0, y: 0 };
+  /** Тач-кнопка «ОГОНЬ» (для Связиста). */
+  touchFire = false;
   readonly touchMode = matchMedia('(pointer:coarse)').matches;
   /** Правый стик геймпада: направление ручного огня (если отклонён). */
   padAim = { x: 0, y: 0, active: false };
@@ -30,6 +32,7 @@ export class Input {
     this.mouse.down = false;
     this.stick.x = 0;
     this.stick.y = 0;
+    this.touchFire = false;
     this.latch = { dash: false, pulse: false };
   }
 
@@ -74,7 +77,7 @@ export class Input {
       aim = { x: player.x + this.padAim.x * 300, y: player.y + this.padAim.y * 300 };
       fire = true;
     }
-    const out: TickInput = { moveX: a.x, moveY: a.y, aimX: aim.x, aimY: aim.y, fire, dash: this.latch.dash, pulse: this.latch.pulse };
+    const out: TickInput = { moveX: a.x, moveY: a.y, aimX: aim.x, aimY: aim.y, fire, fireAuto: this.touchFire, dash: this.latch.dash, pulse: this.latch.pulse };
     this.latch = { dash: false, pulse: false };
     return out;
   }

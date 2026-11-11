@@ -8,8 +8,10 @@ export interface TickInput {
   aimY: number;
   /** Ручной огонь (вариант «зажал = ручной»): все оружия целятся в aim. */
   fire: boolean;
+  /** Команда «огонь» без ручного прицела (тач-кнопка Связиста): оружие стреляет с автонаведением. */
+  fireAuto: boolean;
   dash: boolean;
   pulse: boolean;
 }
 
-export const emptyInput = (): TickInput => ({ moveX: 0, moveY: 0, aimX: 0, aimY: 0, fire: false, dash: false, pulse: false });
+export const emptyInput = (): TickInput => ({ moveX: 0, moveY: 0, aimX: 0, aimY: 0, fire: false, fireAuto: false, dash: false, pulse: false });
