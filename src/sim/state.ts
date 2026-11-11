@@ -59,6 +59,8 @@ export interface Enemy {
   burn: number; burnDps: number; slow: number; slowPct: number;
   /** Телеграф атаки босса (для отрисовки предупреждения). */
   tele: Telegraph | null;
+  /** Кеш прямой видимости до игрока (пересчёт раз в 4 тика со сдвигом по id). */
+  los: boolean;
 }
 
 export interface Telegraph {

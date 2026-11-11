@@ -32,8 +32,12 @@ export class Fx {
     return 14 * this.trauma * this.trauma * this.shakeScale;
   }
 
+  /** Множитель количества частиц (качество «экономия» — 0.5). */
+  particleScale = 1;
+
   burst(x: number, y: number, color: string, n = 15, force = 180): void {
-    for (let i = 0; i < n; i++) {
+    const count = Math.max(1, Math.round(n * this.particleScale));
+    for (let i = 0; i < count; i++) {
       const a = rnd(0, TAU);
       const sp = rnd(30, force);
       const q = this.particles.spawn();

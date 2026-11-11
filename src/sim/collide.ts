@@ -23,33 +23,31 @@ export function segDistance(x1: number, y1: number, x2: number, y2: number, x: n
   return Math.hypot(x - x1 - t * dx, y - y1 - t * dy);
 }
 
-/** Пересекает ли отрезок прямоугольник, расширенный на r (Liang–Barsky). */
-export function segRect(x1: number, y1: number, x2: number, y2: number, o: Rect, r: number): boolean {
-  let t0 = 0;
-  let t1 = 1;
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const edges: Array<[number, number]> = [
-    [-dx, x1 - o.x + r],
-    [dx, o.x + o.w + r - x1],
-    [-dy, y1 - o.y + r],
-    [dy, o.y + o.h + r - y1],
-  ];
-  for (const [a, b] of edges) {
-    if (a === 0) {
-      if (b < 0) return false;
-    } else {
-      const t = b / a;
-      if (a < 0) {
-        if (t > t1) return false;
-        t0 = Math.max(t0, t);
-      } else {
-        if (t < t0) return false;
-        t1 = Math.min(t1, t);
-      }
-    }
+/** Одна грань Liang–Barsky: сужает [t0, t1]; false — отрезок вне. Без аллокаций (горячий путь). */
+let T0 = 0;
+let T1 = 1;
+function clip(a: number, b: number): boolean {
+  if (a === 0) return b >= 0;
+  const t = b / a;
+  if (a < 0) {
+    if (t > T1) return false;
+    if (t > T0) T0 = t;
+  } else {
+    if (t < T0) return false;
+    if (t < T1) T1 = t;
   }
   return true;
+}
+
+/** Пересекает ли отрезок прямоугольник, расширенный на r (Liang–Barsky). */
+export function segRect(x1: number, y1: number, x2: number, y2: number, o: Rect, r: number): boolean {
+  // быстрый отсев по габаритам
+  if (Math.max(x1, x2) < o.x - r || Math.min(x1, x2) > o.x + o.w + r || Math.max(y1, y2) < o.y - r || Math.min(y1, y2) > o.y + o.h + r) return false;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  T0 = 0;
+  T1 = 1;
+  return clip(-dx, x1 - o.x + r) && clip(dx, o.x + o.w + r - x1) && clip(-dy, y1 - o.y + r) && clip(dy, o.y + o.h + r - y1);
 }
 
 export interface Body {

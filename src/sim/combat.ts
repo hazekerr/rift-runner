@@ -125,7 +125,7 @@ export function spawnEnemyNow(s: SimState, type: EnemyType, x: number, y: number
     id: s.nextId++, type, elite, x, y, px: x, py: y, hp, maxHp: hp,
     r: def.r * (elite ? ELITE.size : 1), speed: def.speed, contact: def.contact * dmgMult, shotDmg: def.shotDmg * dmgMult,
     shot: range(s.rng.spawn, 0.8, 2), hit: 0, a: 0, dead: false, phase: range(s.rng.spawn, 0, TAU),
-    ai: 0, aiT: 0, vx: 0, vy: 0, hasted: false, shielded: false, burn: 0, burnDps: 0, slow: 0, slowPct: 0, tele: null,
+    ai: 0, aiT: 0, vx: 0, vy: 0, hasted: false, shielded: false, burn: 0, burnDps: 0, slow: 0, slowPct: 0, tele: null, los: true,
   };
   if (isBoss(type)) {
     e.aiT = 1.5;

@@ -52,6 +52,26 @@ export class Renderer {
     this.arenaLayer = null;
   }
 
+  private vignetteLayer: HTMLCanvasElement | null = null;
+
+  /** Виньетка: градиент на весь экран дорог — рисуем один раз на размер окна. */
+  private vignette(): HTMLCanvasElement {
+    if (this.vignetteLayer && this.vignetteLayer.width === Math.round(this.W / 2) && this.vignetteLayer.height === Math.round(this.H / 2)) return this.vignetteLayer;
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(this.W / 2));
+    c.height = Math.max(1, Math.round(this.H / 2));
+    const g = c.getContext('2d')!;
+    const w = c.width;
+    const h = c.height;
+    const grad = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.25, w / 2, h / 2, Math.max(w, h) * 0.7);
+    grad.addColorStop(0, '#03080b00');
+    grad.addColorStop(1, '#03080ba0');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, w, h);
+    this.vignetteLayer = c;
+    return c;
+  }
+
   private pathPoly(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, n: number, rotation = 0): void {
     ctx.beginPath();
     for (let i = 0; i < n; i++) {
@@ -106,11 +126,7 @@ export class Renderer {
     this.drawFloaters(fx);
     ctx.restore();
 
-    const vignette = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.7);
-    vignette.addColorStop(0, '#03080b00');
-    vignette.addColorStop(1, '#03080ba0');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, W, H);
+    if (!this.lowQuality) ctx.drawImage(this.vignette(), 0, 0, W, H);
 
     if (s && view.crosshair) this.drawCrosshair(s, view);
   }
@@ -391,6 +407,16 @@ export class Renderer {
 
   private drawEnemies(s: SimState, alpha: number): void {
     const ctx = this.ctx;
+    // все тени одним путём
+    ctx.fillStyle = '#05090c77';
+    ctx.beginPath();
+    for (const e of s.enemies) {
+      const ex = lerp(e.px, e.x, alpha) + 4;
+      const ey = lerp(e.py, e.y, alpha) + 8;
+      ctx.moveTo(ex + e.r * 1.1, ey);
+      ctx.ellipse(ex, ey, e.r * 1.1, e.r * 0.8, 0, 0, TAU);
+    }
+    ctx.fill();
     for (const e of s.enemies) {
       const ex = lerp(e.px, e.x, alpha);
       const ey = lerp(e.py, e.y, alpha);
@@ -416,10 +442,6 @@ export class Renderer {
       }
       ctx.save();
       ctx.translate(ex, ey);
-      ctx.fillStyle = '#05090c77';
-      ctx.beginPath();
-      ctx.ellipse(4, 8, e.r * 1.1, e.r * 0.8, 0, 0, TAU);
-      ctx.fill();
       ctx.rotate(e.a);
       const glow = e.hit > 0 || e.elite || isBoss(e.type);
       if (glow) { ctx.shadowColor = color; ctx.shadowBlur = this.glow ? e.hit > 0 ? 18 : 10 : 0; }
@@ -515,22 +537,34 @@ export class Renderer {
       ctx.lineCap = 'butt';
       return;
     }
+    // вражеские снаряды: ореол, тело, белое ядро — тремя проходами пачкой по цвету
+    const groups = new Map<string, number[]>();
     for (const b of s.bullets) {
       if (b.friendly) continue;
-      const bx = lerp(b.px, b.x, alpha);
-      const by = lerp(b.py, b.y, alpha);
-      ctx.fillStyle = b.color;
-      ctx.globalAlpha = 0.35;
-      ctx.beginPath();
-      ctx.arc(bx, by, b.r + 4, 0, TAU);
-      ctx.fill();
+      let arr = groups.get(b.color);
+      if (!arr) { arr = []; groups.set(b.color, arr); }
+      arr.push(lerp(b.px, b.x, alpha), lerp(b.py, b.y, alpha), b.r);
+    }
+    for (const [color, arr] of groups) {
+      ctx.fillStyle = color;
+      for (const [k, a] of [[4, 0.35], [0, 1]] as const) {
+        ctx.globalAlpha = a;
+        ctx.beginPath();
+        for (let i = 0; i < arr.length; i += 3) {
+          const r = arr[i + 2]! + k;
+          ctx.moveTo(arr[i]! + r, arr[i + 1]!);
+          ctx.arc(arr[i]!, arr[i + 1]!, r, 0, TAU);
+        }
+        ctx.fill();
+      }
       ctx.globalAlpha = 1;
-      ctx.beginPath();
-      ctx.arc(bx, by, b.r, 0, TAU);
-      ctx.fill();
       ctx.fillStyle = '#ffe5ff';
       ctx.beginPath();
-      ctx.arc(bx, by, b.r * 0.5, 0, TAU);
+      for (let i = 0; i < arr.length; i += 3) {
+        const r = arr[i + 2]! * 0.5;
+        ctx.moveTo(arr[i]! + r, arr[i + 1]!);
+        ctx.arc(arr[i]!, arr[i + 1]!, r, 0, TAU);
+      }
       ctx.fill();
     }
   }
