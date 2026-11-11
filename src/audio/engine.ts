@@ -7,7 +7,11 @@ export class AudioEngine {
   private noiseBuffer: AudioBuffer | null = null;
   private master: GainNode | null = null;
   sfx: GainNode | null = null;
+  music: GainNode | null = null;
   muted = false;
+  private vol = { music: 0.5, sfx: 0.8 };
+  /** Вызывается после создания контекста (запуск эмбиента). */
+  onReady: ((e: AudioEngine) => void) | null = null;
 
   /** Вызывать из обработчика жеста пользователя (анлок аудио в браузере). */
   init(): void {
@@ -20,10 +24,14 @@ export class AudioEngine {
         this.master.connect(ctx.destination);
         this.sfx = ctx.createGain();
         this.sfx.connect(this.master);
+        this.music = ctx.createGain();
+        this.music.connect(this.master);
+        this.applyVolumes();
         const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.2), ctx.sampleRate);
         const data = buf.getChannelData(0);
         for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
         this.noiseBuffer = buf;
+        this.onReady?.(this);
       }
       if (this.ctx.state === 'suspended') void this.ctx.resume();
     } catch {
@@ -34,6 +42,24 @@ export class AudioEngine {
   setMuted(m: boolean): void {
     this.muted = m;
     if (!m) this.init();
+    this.applyVolumes();
+  }
+
+  setVolumes(music: number, sfx: number): void {
+    this.vol = { music, sfx };
+    this.applyVolumes();
+  }
+
+  private applyVolumes(): void {
+    if (!this.ctx || !this.sfx || !this.music) return;
+    const t0 = this.ctx.currentTime;
+    this.sfx.gain.setTargetAtTime(this.muted ? 0 : this.vol.sfx, t0, 0.02);
+    this.music.gain.setTargetAtTime(this.muted ? 0 : this.vol.music * 0.6, t0, 0.05);
+  }
+
+  /** Общий буфер шума (для эмбиента). */
+  get noise_(): AudioBuffer | null {
+    return this.noiseBuffer;
   }
 
   tone(freq: number, duration: number, type: OscillatorType = 'sine', vol = 0.05, end = 0): void {
