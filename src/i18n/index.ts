@@ -1,11 +1,13 @@
 import { PRODUCT } from '../config';
 import { ru } from './ru';
+import { en } from './en';
 
 export type I18nKey = keyof typeof ru;
 export type Dict = Partial<Record<I18nKey, string>>;
 export type Lang = 'ru' | 'en';
 
-const dicts: Record<Lang, Dict> = { ru, en: {} };
+const dicts: Record<Lang, Dict> = { ru, en };
+export const LANGS: readonly Lang[] = ['ru', 'en'];
 let current: Lang = 'ru';
 
 export function registerDict(lang: Lang, dict: Dict): void {
@@ -16,6 +18,11 @@ export function setLang(lang: Lang): void {
 }
 export function getLang(): Lang {
   return current;
+}
+
+/** Число с разделителями разрядов по текущему языку. */
+export function fmtNum(n: number): string {
+  return Math.round(n).toLocaleString(current === 'ru' ? 'ru-RU' : 'en-US');
 }
 
 const BUILTIN: Record<string, string> = { name: PRODUCT.name, short: PRODUCT.short };
