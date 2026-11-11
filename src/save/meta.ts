@@ -4,6 +4,7 @@ import { OPERATORS, type OperatorDef } from '../content/operators';
 /**
  * Мета-сохранение с версией схемы. Новая версия = новая ветка в migrate(), старые данные не теряются.
  * v1 (этап 1–3): рекорд и звук. v2 (этап 4): открытые операторы и статистика за все забеги.
+ * v3 (этап 5): настройки и уровни Угрозы.
  */
 export interface Lifetime {
   runs: number;
@@ -14,19 +15,35 @@ export interface Lifetime {
   wins: number;
 }
 
-export interface MetaV2 {
-  v: 2;
+export type Quality = 'high' | 'low';
+
+export interface Settings {
+  music: number;
+  sfx: number;
+  shake: number;
+  flashes: boolean;
+  numbers: boolean;
+  lang: 'ru' | 'en';
+  quality: Quality;
+}
+
+export interface MetaV3 {
+  v: 3;
   best: number;
   muted: boolean;
   unlocked: string[];
   lastOperator: string;
   life: Lifetime;
+  /** Максимальный открытый уровень Угрозы (0 — ещё нет побед) и последний выбранный. */
+  maxThreat: number;
+  lastThreat: number;
+  settings: Settings;
 }
-export type Meta = MetaV2;
+export type Meta = MetaV3;
 
 export const META_KEY = `${PRODUCT.storagePrefix}-meta`;
 const LEGACY_BEST_KEY = 'rr-best';
-export const META_VERSION = 2;
+export const META_VERSION = 3;
 
 export interface KV {
   getItem(k: string): string | null;
@@ -34,7 +51,12 @@ export interface KV {
 }
 
 const emptyLife = (): Lifetime => ({ runs: 0, kills: 0, bestWave: 0, bestScrap: 0, guardianKills: 0, wins: 0 });
-export const defaultMeta = (): Meta => ({ v: 2, best: 0, muted: false, unlocked: ['operator'], lastOperator: 'operator', life: emptyLife() });
+export const defaultSettings = (): Settings => ({ music: 0.5, sfx: 0.8, shake: 1, flashes: true, numbers: true, lang: 'ru', quality: 'high' });
+export const defaultMeta = (): Meta => ({
+  v: 3, best: 0, muted: false, unlocked: ['operator'], lastOperator: 'operator', life: emptyLife(),
+  maxThreat: 0, lastThreat: 0, settings: defaultSettings(),
+});
+const unit = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d);
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
 
@@ -55,6 +77,20 @@ export function migrate(raw: unknown): Meta {
   if (r.life && typeof r.life === 'object') {
     const l = r.life as Record<string, unknown>;
     m.life = { runs: num(l.runs), kills: num(l.kills), bestWave: num(l.bestWave), bestScrap: num(l.bestScrap), guardianKills: num(l.guardianKills), wins: num(l.wins) };
+  }
+  // v3: Угроза открывается победами — у старых сохранений выводим из числа побед
+  m.maxThreat = Math.min(4, r.maxThreat !== undefined ? num(r.maxThreat) : m.life.wins > 0 ? 1 : 0);
+  m.lastThreat = Math.min(m.maxThreat, num(r.lastThreat));
+  if (r.settings && typeof r.settings === 'object') {
+    const st = r.settings as Record<string, unknown>;
+    const d = defaultSettings();
+    m.settings = {
+      music: unit(st.music, d.music), sfx: unit(st.sfx, d.sfx), shake: unit(st.shake, d.shake),
+      flashes: typeof st.flashes === 'boolean' ? st.flashes : d.flashes,
+      numbers: typeof st.numbers === 'boolean' ? st.numbers : d.numbers,
+      lang: st.lang === 'en' ? 'en' : 'ru',
+      quality: st.quality === 'low' ? 'low' : 'high',
+    };
   }
   return m;
 }
@@ -110,6 +146,7 @@ export interface RunSummary {
   guardianKills: number;
   won: boolean;
   score: number;
+  threat: number;
 }
 
 /** Записать итог забега; вернуть id операторов, открытых этим забегом. */
@@ -119,7 +156,11 @@ export function recordRun(m: Meta, r: RunSummary): string[] {
   m.life.bestWave = Math.max(m.life.bestWave, r.wave);
   m.life.bestScrap = Math.max(m.life.bestScrap, r.scrap);
   m.life.guardianKills += r.guardianKills;
-  if (r.won) m.life.wins++;
+  if (r.won) {
+    m.life.wins++;
+    // победа на Угрозе N открывает N+1
+    m.maxThreat = Math.min(4, Math.max(m.maxThreat, r.threat + 1));
+  }
   m.best = Math.max(m.best, r.score);
   const opened: string[] = [];
   for (const op of OPERATORS) {
