@@ -1,8 +1,8 @@
-import { MAX_WEAPONS, weaponById, WEAPONS } from '../content/weapons';
+import { WEAPONS } from '../content/weapons';
 import { RARITY_COLOR, RARITY_PIPS } from '../content/levelups';
 import { STATS } from '../content/stats';
 import { ENEMIES } from '../content/enemies';
-import { rerollCost, TIER_MULT } from '../content/balance';
+import { rerollCost } from '../content/balance';
 import { t, type I18nKey } from '../i18n';
 import type { SimState } from '../sim/state';
 import { $, h } from './dom';
@@ -32,24 +32,6 @@ export function renderLevelUp(s: SimState, onPick: (i: number) => void, onReroll
   rr.textContent = t('lvl.reroll', { n: cost });
   rr.disabled = s.scrap < cost;
   rr.onclick = onReroll;
-}
-
-/** Временный экран снабжения: выбор оружия (до магазина этапа 3). */
-export function renderSupply(s: SimState, onPick: (id: string | null) => void): void {
-  $('supplyinfo').textContent = t('sup.eyebrow', { n: s.p.weapons.length, m: MAX_WEAPONS });
-  const cards = $('supplycards');
-  cards.replaceChildren();
-  for (const id of s.supplyOffer) {
-    const def = weaponById(id);
-    const dps = Math.round(((def.damage * TIER_MULT[0]! * (def.pellets ?? 1)) / def.cooldown) * (def.kind === 'chain' ? 1 : 1));
-    const sym = h('span', 'symbol', '▮');
-    sym.style.color = def.color;
-    const tags = h('div', 'tags', ...def.tags.map((tag) => h('span', '', t(`tag.${tag}` as I18nKey))));
-    const card = h('button', 'card', sym, h('b', '', t(def.name)), h('p', '', t(def.desc)), h('p', '', t('sup.dps', { n: dps })), tags);
-    card.addEventListener('click', () => onPick(id));
-    cards.append(card);
-  }
-  $('supplyskip').onclick = () => onPick(null);
 }
 
 /** Поражение или победа со статистикой забега. */

@@ -9,16 +9,20 @@ import { Renderer, type ViewState } from './render/renderer';
 import { Camera } from './render/camera';
 import { Fx } from './render/fx';
 import { startRun, step } from './sim/step';
-import { chooseLevel, chooseSupply, rerollLevel } from './sim/waves';
+import { chooseLevel, leaveShop, rerollLevel } from './sim/waves';
+import { buyOffer, mergeWeapon, rerollShop, sellWeapon, toggleLock } from './sim/shop';
 import type { SimEvent } from './sim/events';
 import type { SimState } from './sim/state';
 import { loadMeta, saveMeta, storage } from './save/meta';
 import { $ } from './ui/dom';
 import { Hud } from './ui/hud';
-import { renderEnd, renderLevelUp, renderSupply } from './ui/screens';
+import { renderEnd, renderLevelUp } from './ui/screens';
+import { ShopView } from './ui/shop';
+import { renderStats } from './ui/statspanel';
+import type { StatId } from './content/stats';
 import { DevPanel } from './ui/devpanel';
 
-type AppState = 'menu' | 'play' | 'paused' | 'levelup' | 'supply' | 'over';
+type AppState = 'menu' | 'play' | 'paused' | 'levelup' | 'shop' | 'over';
 
 const kv = storage();
 const meta = loadMeta(kv);
@@ -53,6 +57,16 @@ const updateSoundLabel = (): void => {
 updateSoundLabel();
 
 const hud = new Hud();
+const pauseOpen = new Set<StatId>();
+const withSim = (fn: (s: SimState) => void) => (): void => { if (sim) { fn(sim); drainEvents(); } };
+const shopView = new ShopView({
+  buy: (i) => withSim((s) => buyOffer(s, i, events))(),
+  lock: (i) => withSim((s) => toggleLock(s, i, events))(),
+  reroll: withSim((s) => rerollShop(s, events)),
+  sell: (uid) => withSim((s) => sellWeapon(s, uid, events))(),
+  merge: (uid) => withSim((s) => mergeWeapon(s, uid, events))(),
+  go: withSim((s) => leaveShop(s, events)),
+});
 addEventListener('resize', () => renderer.resize());
 
 const toWorld = (sx: number, sy: number): { x: number; y: number } => ({
@@ -81,7 +95,7 @@ function start(): void {
   events.length = 0;
   sim = startRun((Math.random() * 2 ** 32) >>> 0, events);
   camera.snap(sim.p.x, sim.p.y);
-  for (const id of ['menu', 'gameover', 'pausemenu', 'upgrades', 'supply']) show(id, false);
+  for (const id of ['menu', 'gameover', 'pausemenu', 'upgrades', 'shop']) show(id, false);
   for (const id of ['hud', 'utility', 'touchcontrols']) show(id, true);
   app = 'play';
   drainEvents();
@@ -94,6 +108,7 @@ function pause(): void {
     input.reset();
     $('knob').style.transform = '';
     show('pausemenu', true);
+    if (sim) renderStats($('pausestats'), sim.p, pauseOpen, null);
     $('toast').style.opacity = '0';
   } else if (app === 'paused') {
     app = 'play';
@@ -113,15 +128,15 @@ function syncPhase(): void {
   const s = sim;
   if (!s) return;
   show('upgrades', s.phase === 'levelup');
-  show('supply', s.phase === 'supply');
+  show('shop', s.phase === 'shop');
   if (s.phase === 'levelup') {
     app = 'levelup';
     input.mouse.down = false;
     renderLevelUp(s, (i) => { chooseLevel(s, i, events); drainEvents(); }, () => { rerollLevel(s, events); drainEvents(); });
-  } else if (s.phase === 'supply') {
-    app = 'supply';
+  } else if (s.phase === 'shop') {
+    app = 'shop';
     input.mouse.down = false;
-    renderSupply(s, (id) => { chooseSupply(s, id, events); drainEvents(); });
+    shopView.render(s);
   } else if (s.phase === 'over' || s.phase === 'victory') {
     app = 'over';
     input.mouse.down = false;
@@ -186,7 +201,7 @@ startLoop({
     input.pollGamepad();
     hitstop = Math.max(0, hitstop - frameDt);
     hitstopCd = Math.max(0, hitstopCd - frameDt);
-    if (app !== 'paused' && app !== 'levelup' && app !== 'supply') {
+    if (app !== 'paused' && app !== 'levelup' && app !== 'shop') {
       fx.update(frameDt);
       toastTime -= frameDt;
       if (toastTime <= 0) $('toast').style.opacity = '0';
@@ -288,5 +303,6 @@ stickEl.addEventListener('pointercancel', stickEnd);
   get sim() { return sim; },
   get app() { return app; },
   chooseLevel: (i: number) => { if (sim) { chooseLevel(sim, i, events); drainEvents(); } },
-  chooseSupply: (id: string | null) => { if (sim) { chooseSupply(sim, id, events); drainEvents(); } },
+  buy: (i: number) => { if (sim) { buyOffer(sim, i, events); drainEvents(); } },
+  leaveShop: () => { if (sim) { leaveShop(sim, events); drainEvents(); } },
 };
