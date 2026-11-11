@@ -8,7 +8,7 @@ import { threatMods } from '../content/threat';
 import { hurtPlayer } from './combat';
 import type { EventSink } from './events';
 import type { Enemy, SimState } from './state';
-import { enemyHash, flow, move } from './world';
+import { enemyHash, flow, move, rebuildEnemyHash } from './world';
 
 function enemyShot(s: SimState, e: Enemy, angle: number, speed: number, dmg: number): void {
   const x = e.x + Math.cos(angle) * (e.r + 8);
@@ -29,8 +29,8 @@ function applySupport(s: SimState, dt: number, ev: EventSink): void {
     if (src.dead) continue;
     if (src.elite) {
       enemyHash.queryCircle(src.x, src.y, ELITE.auraRange, (i) => {
-        const o = s.enemies[i]!;
-        if (o === src || o.dead || dist(o, src) > ELITE.auraRange) return;
+        const o = s.enemies[i];
+        if (!o || o === src || o.dead || dist(o, src) > ELITE.auraRange) return;
         if (src.elite === 'haste') o.hasted = true;
         else if (src.elite === 'shield') o.shielded = true;
         else o.hp = Math.min(o.maxHp, o.hp + o.maxHp * 0.04 * dt);
@@ -39,8 +39,8 @@ function applySupport(s: SimState, dt: number, ev: EventSink): void {
     if (src.type === 'healer') {
       src.aiT -= dt;
       enemyHash.queryCircle(src.x, src.y, HEAL_RANGE, (i) => {
-        const o = s.enemies[i]!;
-        if (o === src || o.dead || isBoss(o.type) || dist(o, src) > HEAL_RANGE) return;
+        const o = s.enemies[i];
+        if (!o || o === src || o.dead || isBoss(o.type) || dist(o, src) > HEAL_RANGE) return;
         o.hp = Math.min(o.maxHp, o.hp + HEAL_PER_SEC * (src.maxHp / 45) * dt);
       });
       if (src.aiT <= 0) {
@@ -54,7 +54,7 @@ function applySupport(s: SimState, dt: number, ev: EventSink): void {
 export function updateEnemies(s: SimState, dt: number, ev: EventSink): void {
   const p = s.p;
   flow.update(p.x, p.y, s.obstacles);
-  enemyHash.build(s.enemies);
+  rebuildEnemyHash(s);
   applySupport(s, dt, ev);
 
   for (const e of s.enemies) {
@@ -92,7 +92,9 @@ export function updateEnemies(s: SimState, dt: number, ev: EventSink): void {
     let vx = dx / d;
     let vy = dy / d;
     // Прямая видимость: прямое преследование; иначе обход по полю потоков
-    const los = !s.obstacles.some((o) => segRect(e.x, e.y, p.x, p.y, o, e.r * 0.5));
+    // Прямая видимость дорогая (отрезок × все стены) — пересчитываем раз в 4 тика со сдвигом по id
+    if ((s.tick + e.id) % 4 === 0) e.los = !s.obstacles.some((o) => segRect(e.x, e.y, p.x, p.y, o, e.r * 0.5));
+    const los = e.los;
     if (!los) {
       const fdir = flow.direction(e.x, e.y);
       if (fdir) { vx = fdir.x; vy = fdir.y; }
@@ -128,8 +130,8 @@ export function updateEnemies(s: SimState, dt: number, ev: EventSink): void {
       }
     }
     enemyHash.queryCircle(e.x, e.y, e.r + 60, (j) => {
-      const other = s.enemies[j]!;
-      if (other === e || other.dead) return;
+      const other = s.enemies[j];
+      if (!other || other === e || other.dead) return;
       const ed = dist(e, other);
       const safe = e.r + other.r + 6;
       if (ed < safe && ed > 0) {

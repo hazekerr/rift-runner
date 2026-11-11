@@ -121,3 +121,18 @@ describe('локализация', () => {
     }
   });
 });
+
+describe('регресс: ударная волна + взрывы при убийстве', () => {
+  it('не падает на устаревших индексах сетки после смертей в прошлом тике', async () => {
+    const { addModule } = await import('../src/sim/state');
+    const ev: SimEvent[] = [];
+    const s = startRun(5, ev);
+    s.god = true; s.waveLeft = 999; s.spawnAcc = -1e9; s.burstsDone = 99;
+    for (let i = 0; i < 4; i++) addModule(s.p, 'blastcore');
+    for (let i = 0; i < 40; i++) { const e = spawnEnemyNow(s, 'drone', s.p.x + 60 + (i % 8) * 20, s.p.y - 80 + Math.floor(i / 8) * 30, null); e.hp = 1; }
+    step(s, emptyInput(), DT, ev); // часть умирает, массив уплотняется
+    for (let i = 0; i < 10; i++) { const e = spawnEnemyNow(s, 'drone', s.p.x - 60, s.p.y + i * 12, null); e.hp = 1; }
+    s.p.energy = 100;
+    expect(() => step(s, { ...emptyInput(), pulse: true }, DT, ev)).not.toThrow();
+  });
+});

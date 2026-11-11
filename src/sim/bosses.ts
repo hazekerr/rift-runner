@@ -5,11 +5,11 @@
  */
 import { TAU } from '../core/math';
 import { range } from '../core/rng';
-import { segDistance } from './collide';
+import { segDistance, segRect } from './collide';
 import { hurtPlayer } from './combat';
 import type { EventSink } from './events';
 import type { Enemy, SimState, Telegraph } from './state';
-import { move } from './world';
+import { flow, move } from './world';
 import { threatMods } from '../content/threat';
 
 type Pattern = 'volley' | 'fan' | 'charge' | 'spiral' | 'ringGap' | 'lasers' | 'summon' | 'slam';
@@ -135,6 +135,25 @@ function execute(s: SimState, e: Enemy, p: Pattern, ev: EventSink): void {
   }
 }
 
+/** Движение босса: держит дистанцию при прямой видимости, иначе обходит стены по полю потоков. */
+function bossMove(s: SimState, e: Enemy, dt: number, factor: number): void {
+  const p = s.p;
+  const dx = p.x - e.x;
+  const dy = p.y - e.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const want = e.type === 'heart' ? 320 : 120;
+  const sp = e.speed * factor * (s.overtime ? 1.3 : 1) * (e.slow > 0 ? 1 - e.slowPct / 100 : 1);
+  // Без прямой видимости — обход по полю потоков (иначе босс застревает за стеной и бой не кончается)
+  const los = !s.obstacles.some((o) => segRect(e.x, e.y, p.x, p.y, o, e.r * 0.5));
+  if (!los) {
+    const f = flow.direction(e.x, e.y);
+    if (f) move(s, e, f.x * sp * dt, f.y * sp * dt);
+  } else {
+    const dir = d > want ? 1 : -0.6;
+    move(s, e, (dx / d) * sp * dir * dt, (dy / d) * sp * dir * dt);
+  }
+}
+
 /** Обновить босса (движение, паттерны, телеграфы). У Сердца поле vx хранит текущую фазу. */
 export function updateBoss(s: SimState, e: Enemy, dt: number, ev: EventSink): void {
   const p = s.p;
@@ -160,16 +179,13 @@ export function updateBoss(s: SimState, e: Enemy, dt: number, ev: EventSink): vo
   if (e.tele) e.tele.t = Math.max(0, e.aiT);
 
   if (e.ai === 0) {
-    // преследование/дистанция
-    const want = e.type === 'heart' ? 320 : 120;
-    const sp = e.speed * (s.overtime ? 1.3 : 1) * (e.slow > 0 ? 1 - e.slowPct / 100 : 1);
-    const dir = d > want ? 1 : -0.6;
-    move(s, e, (dx / d) * sp * dir * dt, (dy / d) * sp * dir * dt);
+    bossMove(s, e, dt, 1);
     if (e.aiT <= 0) {
       const k = e.shot % list.length;
       startTelegraph(s, e, list[k]!, k, a, ev);
     }
   } else if (e.ai < 20) {
+    if (e.type === 'heart') bossMove(s, e, dt, 0.4);
     if (e.type === 'boss' && list[e.ai - 10] !== 'charge' && e.tele) { e.tele.x = e.x; e.tele.y = e.y; }
     if (e.aiT <= 0) {
       const k = e.ai - 10;
@@ -186,6 +202,7 @@ export function updateBoss(s: SimState, e: Enemy, dt: number, ev: EventSink): vo
       const vy = e.tele ? Math.sin(e.tele.a) : 0;
       move(s, e, vx * 720 * dt, vy * 720 * dt);
     }
+    if (e.type === 'heart') bossMove(s, e, dt, 0.4);
     if (pat === 'spiral') {
       // 4 потока, поворачиваются; выстрел каждые ~0.12 с
       if (Math.floor((e.aiT + dt) / 0.12) !== Math.floor(e.aiT / 0.12)) {

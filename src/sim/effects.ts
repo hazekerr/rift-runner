@@ -89,8 +89,8 @@ type DamageFn = (s: SimState, e: Enemy, raw: number, crit: boolean, weapon: stri
 /** Урон по области (взрыв/нова), без рекурсии эффектов. */
 export function areaDamage(s: SimState, x: number, y: number, r: number, dmg: number, source: string, ev: EventSink, dmgFn: DamageFn): void {
   enemyHash.queryCircle(x, y, r + MAX_ENEMY_R, (i) => {
-    const e = s.enemies[i]!;
-    if (e.dead || Math.hypot(e.x - x, e.y - y) > r + e.r) return;
+    const e = s.enemies[i];
+    if (!e || e.dead || Math.hypot(e.x - x, e.y - y) > r + e.r) return;
     dmgFn(s, e, dmg, false, source, ev, true, 1);
   });
 }

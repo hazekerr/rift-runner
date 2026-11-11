@@ -139,3 +139,15 @@ describe('боссы', () => {
     expect(kinds.has('lines')).toBe(true);
   });
 });
+
+describe('регресс: босс не застревает за стеной', () => {
+  it('Сердце за верхней стеной выходит к оператору', () => {
+    const { s, ev } = arena(31);
+    s.p.weapons = [];
+    s.wave = 20;
+    const h = spawnEnemyNow(s, 'heart', 1015, 152, null); // точка, где застревало в баланс-прогоне
+    s.p.x = 630; s.p.y = 624;
+    for (let i = 0; i < 60 * 15; i++) { s.p.x = 630; s.p.y = 624; step(s, emptyInput(), DT, ev); }
+    expect(Math.hypot(h.x - 630, h.y - 624)).toBeLessThan(450);
+  });
+});

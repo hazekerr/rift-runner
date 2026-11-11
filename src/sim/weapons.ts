@@ -83,8 +83,8 @@ function orbitHit(s: SimState, def: WeaponDef, inst: WeaponInst, ev: EventSink):
   for (let k = 0; k < (def.blades ?? 2); k++) {
     const b = bladePos(s, inst, def, k);
     enemyHash.queryCircle(b.x, b.y, 16 + MAX_ENEMY_R, (i) => {
-      const e = s.enemies[i]!;
-      if (e.dead || Math.hypot(e.x - b.x, e.y - b.y) > e.r + 16) return;
+      const e = s.enemies[i];
+      if (!e || e.dead || Math.hypot(e.x - b.x, e.y - b.y) > e.r + 16) return;
       const { dmg, crit } = rollWeaponDamage(s, def, inst);
       damageEnemy(s, e, dmg, crit, def.id, ev);
       any = true;

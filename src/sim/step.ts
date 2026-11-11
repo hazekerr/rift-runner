@@ -16,7 +16,7 @@ import { createRun, maxHpOf, type SimState } from './state';
 import { gainScrap, startWave, updateWave } from './waves';
 import { updateWeapons } from './weapons';
 import { onDash, tickEffects } from './effects';
-import { enemyHash, MAX_ENEMY_R, move, nearestEnemy } from './world';
+import { enemyHash, liveMaxR, MAX_ENEMY_R, move, nearestEnemy, rebuildEnemyHash } from './world';
 import { chance } from '../core/rng';
 import { effectScale } from './effects';
 
@@ -111,7 +111,7 @@ function updatePlayer(s: SimState, inp: TickInput, dt: number, ev: EventSink): v
 
 function updateBullets(s: SimState, dt: number, ev: EventSink): void {
   const p = s.p;
-  enemyHash.build(s.enemies);
+  rebuildEnemyHash(s);
   for (let i = s.bullets.length - 1; i >= 0; i--) {
     const b = s.bullets[i]!;
     b.px = b.x;
@@ -137,11 +137,11 @@ function updateBullets(s: SimState, dt: number, ev: EventSink): void {
     }
     if (!dead && b.friendly) {
       candidates.length = 0;
-      const pad = MAX_ENEMY_R + b.r;
+      const pad = liveMaxR + b.r;
       enemyHash.queryRect(Math.min(b.px, b.x) - pad, Math.min(b.py, b.y) - pad, Math.max(b.px, b.x) + pad, Math.max(b.py, b.y) + pad, (j) => {
         candidates.push(j);
       });
-      candidates.sort((x, y) => x - y);
+      if (candidates.length > 1) candidates.sort((x, y) => x - y);
       for (const j of candidates) {
         const e = s.enemies[j]!;
         if (e.dead || b.hit.includes(e.id)) continue;
@@ -200,8 +200,8 @@ function updateTraps(s: SimState, dt: number, ev: EventSink): void {
     if (tr.artillery) go = tr.arm <= 0;
     else if (tr.arm <= 0) {
       enemyHash.queryCircle(tr.x, tr.y, 24 + MAX_ENEMY_R, (j) => {
-        const e = s.enemies[j]!;
-        if (!e.dead && Math.hypot(e.x - tr.x, e.y - tr.y) < e.r + 24) go = true;
+        const e = s.enemies[j];
+        if (e && !e.dead && Math.hypot(e.x - tr.x, e.y - tr.y) < e.r + 24) go = true;
       });
     }
     if (go) blast(s, tr.x, tr.y, tr.r, tr.damage, tr.crit, tr.weapon, ev);
@@ -297,6 +297,8 @@ export function step(s: SimState, inp: TickInput, dt: number, ev: EventSink): vo
   p.px = p.x;
   p.py = p.y;
   for (const e of s.enemies) { e.px = e.x; e.py = e.y; }
+  // Сетка должна быть актуальна до любых запросов (ударная волна в updatePlayer может вызвать взрывы)
+  rebuildEnemyHash(s);
 
   updatePlayer(s, inp, dt, ev);
   updateEnemies(s, dt, ev);

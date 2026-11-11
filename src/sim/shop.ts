@@ -15,6 +15,8 @@ import { threatMods } from '../content/threat';
 export const SHOP_SLOTS = 4;
 export const SELL_SHARE = 0.5;
 export const WEAPON_OFFER_CHANCE = 0.35;
+/** Доля оружейных предложений из уже имеющегося оружия (того же тира). */
+export const OWNED_WEAPON_SHARE = 0.4;
 
 /** Цена с учётом волны: floor(base · (1 + 0.1·(w−1))). */
 export const priceAt = (base: number, w: number): number => Math.max(1, Math.floor(base * (1 + 0.1 * (Math.max(1, w) - 1))));
@@ -48,6 +50,12 @@ function rollOffer(s: SimState): ShopOffer {
   const rarity = rollRarity(s);
   if (chance(s.rng.offer, WEAPON_OFFER_CHANCE)) {
     // Сварщик и др.: только оружие с нужным тегом
+    // 40% оружейных позиций — уже имеющееся оружие того же тира: слияния реально случаются
+    const mergeable = s.p.weapons.filter((w) => w.tier < 4);
+    if (mergeable.length && chance(s.rng.offer, OWNED_WEAPON_SHARE)) {
+      const w = mergeable[int(s.rng.offer, mergeable.length)]!;
+      return { kind: 'weapon', id: w.id, tier: w.tier, rarity: w.tier - 1, price: Math.floor(weaponPrice(w.tier, s.wave) * threatMods(s.threat).priceMult), locked: false };
+    }
     const only = operatorById(s.operator).rule.onlyTag;
     const pool = only ? WEAPONS.filter((w) => w.tags.includes(only)) : WEAPONS;
     const def = pool[int(s.rng.offer, pool.length)]!;
