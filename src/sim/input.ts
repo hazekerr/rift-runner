@@ -6,19 +6,10 @@ export interface TickInput {
   /** Точка прицела в мировых координатах. */
   aimX: number;
   aimY: number;
+  /** Ручной огонь (вариант «зажал = ручной»): все оружия целятся в aim. */
   fire: boolean;
-  /** Автоприцел на ближайшего врага (тач). */
-  autoAim: boolean;
   dash: boolean;
   pulse: boolean;
-  reload: boolean;
-  /** Выбор оружия по индексу или null. */
-  weapon: number | null;
-  /** Прокрутка оружия: +1 / -1 / 0. */
-  cycle: number;
 }
 
-export const emptyInput = (): TickInput => ({
-  moveX: 0, moveY: 0, aimX: 0, aimY: 0, fire: false, autoAim: false,
-  dash: false, pulse: false, reload: false, weapon: null, cycle: 0,
-});
+export const emptyInput = (): TickInput => ({ moveX: 0, moveY: 0, aimX: 0, aimY: 0, fire: false, dash: false, pulse: false });
