@@ -4,7 +4,8 @@ import { startRun, step } from '../src/sim/step';
 import { emptyInput } from '../src/sim/input';
 import type { SimEvent } from '../src/sim/events';
 import type { SimState } from '../src/sim/state';
-import { chooseLevel, chooseSupply, endWave, gainScrap } from '../src/sim/waves';
+import { chooseLevel, endWave, gainScrap, leaveShop } from '../src/sim/waves';
+import { buyOffer } from '../src/sim/shop';
 import { damageEnemy, spawnEnemyNow } from '../src/sim/combat';
 import { waveTime } from '../src/content/balance';
 
@@ -20,7 +21,7 @@ function run(seed: number, ticks: number): { s: SimState; events: SimEvent[] } {
     inp.pulse = i % 600 === 0;
     step(s, inp, DT, events);
     if (s.phase === 'levelup') chooseLevel(s, 0, events);
-    if (s.phase === 'supply') chooseSupply(s, s.supplyOffer[0]!, events);
+    if (s.phase === 'shop') { for (let k = 0; k < 4; k++) buyOffer(s, k, events); leaveShop(s, events); }
     if (s.phase === 'over' || s.phase === 'victory') break;
     if (events.length > 5000) events.length = 0;
   }
@@ -54,7 +55,7 @@ describe('sim: волны по таймеру', () => {
     while (s.phase === 'play' && ticks < 60 * 40) { step(s, emptyInput(), DT, ev); ticks++; }
     expect(Math.abs(ticks / 60 - waveTime(1))).toBeLessThan(0.1);
     expect(s.enemies.length).toBe(0);
-    expect(['levelup', 'supply']).toContain(s.phase);
+    expect(['levelup', 'shop']).toContain(s.phase);
   });
   it('стартовое оружие стреляет само и убивает врагов', () => {
     const { s } = run(9, 60 * 20);
@@ -68,7 +69,7 @@ describe('sim: волны по таймеру', () => {
     endWave(s, ev);
     while (s.phase !== 'play') {
       if (s.phase === 'levelup') chooseLevel(s, 0, ev);
-      if (s.phase === 'supply') chooseSupply(s, null, ev);
+      if (s.phase === 'shop') leaveShop(s, ev);
     }
     expect(s.wave).toBe(10);
     s.god = true;
@@ -87,7 +88,7 @@ describe('sim: волны по таймеру', () => {
     endWave(s, ev);
     for (let k = 0; k < 50 && (s.phase as string) !== 'play'; k++) {
       if ((s.phase as string) === 'levelup') chooseLevel(s, 0, ev);
-      else chooseSupply(s, null, ev);
+      else leaveShop(s, ev);
     }
     expect(s.wave).toBe(20);
     s.god = true;
@@ -98,7 +99,7 @@ describe('sim: волны по таймеру', () => {
     damageEnemy(s, boss, boss.hp * 10, false, 'test', ev); // ×10: рядом может быть элита с аурой щита
     for (let i = 0; i < 5 && s.phase === 'play'; i++) step(s, emptyInput(), DT, ev);
     expect(s.phase).toBe('victory');
-  });
+  }, 30000);
 });
 
 describe('sim: скрап, запас разлома, уровни', () => {

@@ -7,12 +7,12 @@ import {
 import { ARENA_CENTER, WORLD } from '../content/arena';
 import { ENEMIES, type Aura, type EnemyType } from '../content/enemies';
 import { LEVEL_UPS } from '../content/levelups';
-import { MAX_WEAPONS, WEAPONS } from '../content/weapons';
 import { waveWeights } from '../content/waves';
 import { circleRect } from './collide';
 import { spawnEnemyNow, sweepScrap } from './combat';
 import type { EventSink } from './events';
-import { refreshStats, type SimState } from './state';
+import { maxHpOf, refreshStats, type SimState } from './state';
+import { openShop } from './shop';
 
 const AURAS: readonly Aura[] = ['haste', 'shield', 'regen'];
 export const isBossWave = (w: number): boolean => BOSS_WAVES.includes(w);
@@ -38,6 +38,8 @@ export function startWave(s: SimState, ev: EventSink): void {
   p.inv = 1.0;
   p.dashCd = 0;
   for (const w of p.weapons) w.cd = 0.3;
+  p.shield = p.fx.waveShield;
+  p.zapT = p.fx.zaps.map(() => 0.5);
   if (isBossWave(s.wave)) {
     s.spawns.push({ type: 'boss', x: ARENA_CENTER.x, y: 90, t: 1.5, elite: null });
     ev.push({ t: 'toast', key: s.wave >= RUN_WAVES ? 'toast.final' : 'toast.boss', sub: 'toast.boss.sub', params: { n: s.wave }, duration: 3 });
@@ -170,19 +172,16 @@ export function endWave(s: SimState, ev: EventSink): void {
   if (s.wave >= RUN_WAVES) {
     s.phase = 'victory';
     ev.push({ t: 'sfx', id: 'victory' });
-  } else intermission(s, ev);
+  } else intermission(s);
   ev.push({ t: 'phase' });
 }
 
-/** Порядок между волнами: уровни → снабжение → следующая волна. */
-function intermission(s: SimState, ev: EventSink): void {
+/** Порядок между волнами: уровни → магазин → (кнопка «В бой») → следующая волна. */
+function intermission(s: SimState): void {
   if (s.pendingLevels > 0) {
     s.phase = 'levelup';
     makeLevelOffer(s);
-  } else if (s.p.weapons.length < MAX_WEAPONS && s.phase !== 'supply') {
-    s.phase = 'supply';
-    makeSupplyOffer(s);
-  } else startWave(s, ev);
+  } else openShop(s);
 }
 
 // ---------- скрап и опыт ----------
@@ -195,6 +194,11 @@ export function gainScrap(s: SimState, v: number, ev: EventSink, useBonus = true
   s.scrap += total;
   s.xp += total;
   s.stats.scrapCollected += total;
+  const every = s.p.fx.scrapHealEvery;
+  if (every > 0 && s.phase === 'play') {
+    s.p.scrapHealAcc += total;
+    while (s.p.scrapHealAcc >= every) { s.p.scrapHealAcc -= every; s.p.hp = Math.min(maxHpOf(s.p), s.p.hp + 1); }
+  }
   while (s.xp >= xpToNext(s.level)) {
     s.xp -= xpToNext(s.level);
     s.level++;
@@ -230,7 +234,7 @@ export function chooseLevel(s: SimState, idx: number, ev: EventSink): boolean {
   refreshStats(s.p);
   s.pendingLevels--;
   ev.push({ t: 'sfx', id: 'choose' });
-  intermission(s, ev);
+  intermission(s);
   ev.push({ t: 'phase' });
   return true;
 }
@@ -249,21 +253,11 @@ export function rerollLevel(s: SimState, ev: EventSink): boolean {
   return true;
 }
 
-// ---------- снабжение (временный источник оружия до магазина этапа 3) ----------
+// ---------- магазин ----------
 
-export function makeSupplyOffer(s: SimState): void {
-  const pool = WEAPONS.map((w) => w.id);
-  s.supplyOffer = [];
-  for (let i = 0; i < 3 && pool.length; i++) s.supplyOffer.push(pool.splice(int(s.rng.offer, pool.length), 1)[0]!);
-}
-
-export function chooseSupply(s: SimState, id: string | null, ev: EventSink): boolean {
-  if (s.phase !== 'supply') return false;
-  if (id !== null) {
-    if (!s.supplyOffer.includes(id) || s.p.weapons.length >= MAX_WEAPONS) return false;
-    s.p.weapons.push({ uid: s.nextId++, id, tier: 1, cd: 0.3, aim: 0, flash: 0, x: s.p.x, y: s.p.y });
-  }
-  s.supplyOffer = [];
+/** Выйти из магазина в следующую волну. */
+export function leaveShop(s: SimState, ev: EventSink): boolean {
+  if (s.phase !== 'shop') return false;
   ev.push({ t: 'sfx', id: 'choose' });
   startWave(s, ev);
   ev.push({ t: 'phase' });
