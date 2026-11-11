@@ -12,7 +12,7 @@ describe('meta save', () => {
   });
   it('мусор и битый JSON → значения по умолчанию', () => {
     expect(loadMeta(mem({ [META_KEY]: '{oops' })).best).toBe(0);
-    expect(migrate({ best: -5, muted: 'yes' })).toMatchObject({ v: 2, best: 0, muted: false, unlocked: ['operator'] });
+    expect(migrate({ best: -5, muted: 'yes' })).toMatchObject({ v: 3, best: 0, muted: false, unlocked: ['operator'] });
   });
   it('сохранение и загрузка', () => {
     const kv = mem();
@@ -30,7 +30,7 @@ describe('meta save', () => {
 describe('meta v2: миграция и открытия', () => {
   it('v1 → v2: рекорд сохраняется, базовый оператор открыт', () => {
     const m = migrate({ v: 1, best: 777, muted: true });
-    expect(m).toMatchObject({ v: 2, best: 777, muted: true, unlocked: ['operator'], lastOperator: 'operator' });
+    expect(m).toMatchObject({ v: 3, best: 777, muted: true, unlocked: ['operator'], lastOperator: 'operator' });
     expect(m.life.runs).toBe(0);
   });
   it('неизвестные операторы и мусор отбрасываются', () => {
@@ -41,8 +41,8 @@ describe('meta v2: миграция и открытия', () => {
   });
   it('recordRun копит статистику и открывает операторов по условиям', () => {
     const m = loadMeta(null);
-    expect(recordRun(m, { wave: 5, kills: 300, scrap: 200, guardianKills: 0, won: false, score: 100 })).toEqual(['welder']);
-    expect(recordRun(m, { wave: 11, kills: 800, scrap: 900, guardianKills: 1, won: false, score: 50 }).sort()).toEqual(['ghost', 'marauder', 'signal']);
+    expect(recordRun(m, { wave: 5, kills: 300, scrap: 200, guardianKills: 0, won: false, score: 100, threat: 0 })).toEqual(['welder']);
+    expect(recordRun(m, { wave: 11, kills: 800, scrap: 900, guardianKills: 1, won: false, score: 50, threat: 0 }).sort()).toEqual(['ghost', 'marauder', 'signal']);
     expect(m.life).toMatchObject({ runs: 2, kills: 1100, bestWave: 11, bestScrap: 900, guardianKills: 1 });
     expect(m.best).toBe(100);
   });

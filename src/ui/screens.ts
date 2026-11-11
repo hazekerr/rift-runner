@@ -5,7 +5,7 @@ import { RARITY_COLOR, RARITY_PIPS } from '../content/levelups';
 import { STATS } from '../content/stats';
 import { ENEMIES } from '../content/enemies';
 import { rerollCost } from '../content/balance';
-import { t, type I18nKey } from '../i18n';
+import { fmtNum, t, type I18nKey } from '../i18n';
 import type { SimState } from '../sim/state';
 import { $, h } from './dom';
 
@@ -41,8 +41,8 @@ export function renderEnd(s: SimState, best: number, previousBest: number): void
   const win = s.phase === 'victory';
   $('overeyebrow').textContent = t(win ? 'win.eyebrow' : 'over.eyebrow');
   $('overtitle').textContent = t(win ? 'win.title' : 'over.title');
-  $('recordmsg').textContent = s.score > previousBest ? t('over.record') : win ? t('win.text') : t('over.normal', { n: best.toLocaleString('ru-RU') });
-  $('finalscore').textContent = s.score.toLocaleString('ru-RU');
+  $('recordmsg').textContent = s.score > previousBest ? t('over.record') : win ? t('win.text') : t('over.normal', { n: fmtNum(best) });
+  $('finalscore').textContent = fmtNum(s.score);
   $('finalwave').textContent = String(s.wave);
   $('finalkills').textContent = String(s.stats.kills);
   $('finaltime').textContent = `${Math.floor(s.time / 60)}:${String(Math.floor(s.time % 60)).padStart(2, '0')}`;
@@ -53,7 +53,7 @@ export function renderEnd(s: SimState, best: number, previousBest: number): void
   }
   const top = Object.entries(s.stats.damageByWeapon).sort((a, b) => b[1] - a[1])[0];
   const def = top && WEAPONS.find((w) => w.id === top[0]);
-  if (top && def) lines.push(t('over.topWeapon', { n: t(def.name), m: Math.round(top[1]).toLocaleString('ru-RU') }));
+  if (top && def) lines.push(t('over.topWeapon', { n: t(def.name), m: fmtNum(Math.round(top[1])) }));
   $('overdetail').textContent = lines.join('\n');
 }
 
@@ -83,7 +83,7 @@ export function renderEndExtra(s: SimState, opened: string[]): void {
     const fill = bar.firstElementChild as HTMLElement;
     fill.style.width = `${(v / max) * 100}%`;
     fill.style.background = color;
-    root.append(h('div', 'row', h('span', '', name), bar, h('span', '', Math.round(v).toLocaleString('ru-RU'))));
+    root.append(h('div', 'row', h('span', '', name), bar, h('span', '', fmtNum(Math.round(v)))));
   }
   for (const id of opened) root.append(h('div', 'unlock', `★ ${t('unlock.new', { n: t(operatorById(id).name) })}`));
 }

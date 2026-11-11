@@ -17,6 +17,8 @@ export interface ViewState {
   hitboxes: boolean;
   /** Ручной огонь активен (подсветка прицела). */
   manual: boolean;
+  /** Вспышки разрешены (белая вспышка врага при попадании). */
+  flashes: boolean;
 }
 
 const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
@@ -28,6 +30,11 @@ export class Renderer {
   DPR = 1;
   private menuObstacles: ObstacleDef[] = makeArena();
   private arenaLayer: HTMLCanvasElement | null = null;
+  /** Качество «экономия»: DPR 1 и без shadowBlur. */
+  lowQuality = false;
+  get glow(): boolean {
+    return !this.lowQuality;
+  }
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -39,7 +46,7 @@ export class Renderer {
   resize(): void {
     this.W = innerWidth;
     this.H = innerHeight;
-    this.DPR = Math.min(devicePixelRatio || 1, 2);
+    this.DPR = this.lowQuality ? 1 : Math.min(devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(this.W * this.DPR);
     this.canvas.height = Math.round(this.H * this.DPR);
     this.arenaLayer = null;
@@ -57,7 +64,15 @@ export class Renderer {
     ctx.closePath();
   }
 
+  private flashes = true;
+
+  /** Сбросить кеш статичной арены (смена языка или качества). */
+  invalidate(): void {
+    this.arenaLayer = null;
+  }
+
   draw(s: SimState | null, alpha: number, fx: Fx, cam: Camera, view: ViewState): void {
+    this.flashes = view.flashes;
     const { ctx, W, H } = this;
     ctx.setTransform(this.DPR, 0, 0, this.DPR, 0, 0);
     ctx.fillStyle = PALETTE.void;
@@ -346,7 +361,7 @@ export class Renderer {
       ctx.save();
       ctx.translate(lerp(item.px, item.x, alpha), lerp(item.py, item.y, alpha));
       ctx.globalAlpha = item.life < 3 ? (Math.sin(now * 0.015) + 1) / 2 : 1;
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = this.glow ? 15 : 0;
       ctx.shadowColor = item.type === 'heal' ? PALETTE.cyan : PALETTE.violet;
       ctx.fillStyle = ctx.shadowColor;
       this.pathPoly(ctx, 0, 0, 12, 4, Math.PI / 4);
@@ -407,9 +422,10 @@ export class Renderer {
       ctx.fill();
       ctx.rotate(e.a);
       const glow = e.hit > 0 || e.elite || isBoss(e.type);
-      if (glow) { ctx.shadowColor = color; ctx.shadowBlur = e.hit > 0 ? 18 : 10; }
+      if (glow) { ctx.shadowColor = color; ctx.shadowBlur = this.glow ? e.hit > 0 ? 18 : 10 : 0; }
+      const flash = e.hit > 0 && this.flashes;
       ctx.strokeStyle = e.hit > 0 ? '#fff' : color;
-      ctx.fillStyle = e.hit > 0 ? '#eee' : isBoss(e.type) ? '#3c1f30' : '#29232a';
+      ctx.fillStyle = flash ? '#eee' : isBoss(e.type) ? '#3c1f30' : '#29232a';
       ctx.lineWidth = isBoss(e.type) || e.elite ? 3 : 2;
       this.enemyBody(e);
       ctx.fill();

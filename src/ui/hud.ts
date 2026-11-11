@@ -29,6 +29,12 @@ export class Hud {
   private timerClass = '';
   private lastBoss: boolean | null = null;
 
+  /** Сбросить кеши (смена языка): следующий update перерисует всё. */
+  reset(): void {
+    this.weaponsKey = '';
+    this.lastBoss = null;
+  }
+
   update(s: SimState, best: number): void {
     const p = s.p;
     const max = maxHpOf(p);
@@ -41,7 +47,7 @@ export class Hud {
     this.xpBar.set(`${Math.min(100, (s.xp / need) * 100)}%`);
     this.score.set(String(s.score).padStart(6, '0'));
     this.best.set(t('hud.best', { n: Math.max(best, s.score) }));
-    this.wave.set(`${t('hud.wave', { n: String(s.wave).padStart(2, '0') })} / ${RUN_WAVES}`);
+    this.wave.set(`${t('hud.wave', { n: String(s.wave).padStart(2, '0') })} / ${RUN_WAVES}${s.threat ? ` · ${t('hud.threat', { n: s.threat })}` : ''}`);
     const left = Math.max(0, Math.ceil(s.waveLeft));
     this.timer.set(s.overtime ? t('hud.overtime') : t('hud.timer', { n: left }));
     const cls = s.overtime ? 'ot' : left <= 5 ? 'low' : '';

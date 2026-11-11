@@ -2,7 +2,7 @@ import './ui/theme.css';
 import { PRODUCT } from './config';
 import { startLoop } from './core/loop';
 import { Input } from './core/input';
-import { applyDom, t, type I18nKey } from './i18n';
+import { applyDom, fmtNum, setLang, t, type I18nKey } from './i18n';
 import { AudioEngine } from './audio/engine';
 import { playSfx } from './audio/bank';
 import { Renderer, type ViewState } from './render/renderer';
@@ -13,8 +13,12 @@ import { chooseLevel, leaveShop, rerollLevel } from './sim/waves';
 import { buyOffer, mergeWeapon, rerollShop, sellWeapon, toggleLock } from './sim/shop';
 import type { SimEvent } from './sim/events';
 import type { SimState } from './sim/state';
-import { loadMeta, recordRun, saveMeta, storage } from './save/meta';
-import { renderOperatorSelect } from './ui/opselect';
+import { loadMeta, recordRun, saveMeta, storage, type Settings } from './save/meta';
+import { clearRun, loadRun, saveRun } from './save/run';
+import { renderSettings } from './ui/settings';
+import { Ambient } from './audio/music';
+import { isBoss } from './content/enemies';
+import { renderOperatorSelect, renderThreat } from './ui/opselect';
 import { operatorById } from './content/operators';
 import { $ } from './ui/dom';
 import { Hud } from './ui/hud';
@@ -35,7 +39,9 @@ const fx = new Fx();
 const audio = new AudioEngine();
 const input = new Input();
 const events: SimEvent[] = [];
-const view: ViewState = { crosshair: false, mouseX: 0, mouseY: 0, hitboxes: false, manual: false };
+const view: ViewState = { crosshair: false, mouseX: 0, mouseY: 0, hitboxes: false, manual: false, flashes: true };
+const ambient = new Ambient();
+audio.onReady = (e) => ambient.start(e);
 
 let app: AppState = 'menu';
 let sim: SimState | null = null;
@@ -44,20 +50,49 @@ let toastTime = 0;
 let hitstop = 0;
 let hitstopCd = 0;
 
-// ---------- статичные тексты ----------
-document.title = t('app.title');
-applyDom();
+// ---------- настройки и тексты ----------
+/** Применить настройки ко всем системам. */
+function applySettings(st: Settings): void {
+  setLang(st.lang);
+  document.documentElement.lang = st.lang;
+  audio.setVolumes(st.music, st.sfx);
+  fx.shakeScale = st.shake;
+  fx.damageNumbers = st.numbers;
+  view.flashes = st.flashes;
+  if (renderer.lowQuality !== (st.quality === 'low')) {
+    renderer.lowQuality = st.quality === 'low';
+    renderer.resize();
+  }
+  renderer.invalidate();
+  refreshTexts();
+}
+
+/** Перерисовать все тексты (при смене языка). */
+function refreshTexts(): void {
+  document.title = t('app.title');
+  applyDom();
+  $('menubest').textContent = t('menu.best', { n: fmtNum(meta.best) });
+  updateContinue();
+  if (typeof updateSoundLabel === 'function') updateSoundLabel();
+  hud.reset();
+  if (sim) hud.update(sim, meta.best);
+  if (sim && app === 'shop') shopView.render(sim);
+}
+
+function updateContinue(): void {
+  const saved = loadRun(kv);
+  show('continue', !!saved);
+  if (saved) $('continueinfo').textContent = t('menu.continueInfo', { op: t(operatorById(saved.operator).name), n: saved.wave });
+}
+
 $('brand-a').textContent = PRODUCT.short.slice(0, -1);
 $('brand-b').textContent = PRODUCT.short.slice(-1);
 $('title-a').textContent = PRODUCT.titleParts[0];
 $('title-b').textContent = PRODUCT.titleParts[1];
-$('menubest').textContent = t('menu.best', { n: meta.best });
 audio.muted = meta.muted;
-const updateSoundLabel = (): void => {
+function updateSoundLabel(): void {
   $('sound').textContent = t(audio.muted ? 'hud.sound.off' : 'hud.sound.on');
-};
-updateSoundLabel();
-
+}
 const hud = new Hud();
 const pauseOpen = new Set<StatId>();
 const withSim = (fn: (s: SimState) => void) => (): void => { if (sim) { fn(sim); drainEvents(); } };
@@ -84,12 +119,15 @@ const dev = new DevPanel({
   view,
 });
 
+applySettings(meta.settings);
+
 // ---------- переходы ----------
 function show(id: string, on: boolean): void {
   $(id).classList.toggle('hidden', !on);
 }
 
 let selectedOp = meta.lastOperator;
+let selectedThreat = meta.lastThreat;
 
 /** Экран выбора оператора (из меню и после забега). */
 function openOperatorSelect(): void {
@@ -97,7 +135,11 @@ function openOperatorSelect(): void {
   app = 'opselect';
   for (const id of ['menu', 'gameover', 'hud', 'utility', 'touchcontrols']) show(id, false);
   if (!meta.unlocked.includes(selectedOp)) selectedOp = 'operator';
-  const rerender = (): void => renderOperatorSelect(meta, selectedOp, (id) => { selectedOp = id; rerender(); });
+  if (selectedThreat > meta.maxThreat) selectedThreat = meta.maxThreat;
+  const rerender = (): void => {
+    renderOperatorSelect(meta, selectedOp, (id) => { selectedOp = id; rerender(); });
+    renderThreat(meta, selectedThreat, (n) => { selectedThreat = n; rerender(); });
+  };
   rerender();
   show('opselect', true);
 }
@@ -106,25 +148,50 @@ function toMenu(): void {
   app = 'menu';
   sim = null;
   for (const id of ['gameover', 'opselect', 'hud', 'utility', 'touchcontrols', 'upgrades', 'shop', 'pausemenu']) show(id, false);
+  updateContinue();
   show('menu', true);
 }
 
 function start(): void {
-  audio.init();
   meta.lastOperator = selectedOp;
+  meta.lastThreat = selectedThreat;
   saveMeta(kv, meta);
+  clearRun(kv);
+  enterRun(startRun((Math.random() * 2 ** 32) >>> 0, events, selectedOp, selectedThreat));
+}
+
+/** Продолжить сохранённый забег (с экрана уровня или магазина). */
+function resumeRun(): void {
+  const saved = loadRun(kv);
+  if (!saved) { updateContinue(); return; }
+  enterRun(saved);
+  events.push({ t: 'toast', key: 'save.resumed', sub: 'save.resumed.sub', params: { n: saved.wave }, duration: 2.2 });
+  events.push({ t: 'phase' });
+  drainEvents();
+}
+
+function enterRun(s: SimState): void {
+  audio.init();
   previousBest = meta.best;
   input.reset();
   fx.clear();
-  events.length = 0;
-  sim = startRun((Math.random() * 2 ** 32) >>> 0, events, selectedOp);
-  camera.snap(sim.p.x, sim.p.y);
+  sim = s;
+  camera.snap(s.p.x, s.p.y);
   for (const id of ['menu', 'gameover', 'pausemenu', 'upgrades', 'shop', 'opselect']) show(id, false);
-  $('touchfire').classList.toggle('hidden', !operatorById(selectedOp).rule.manualOnly);
+  $('touchfire').classList.toggle('hidden', !operatorById(s.operator).rule.manualOnly);
   for (const id of ['hud', 'utility', 'touchcontrols']) show(id, true);
   app = 'play';
   drainEvents();
-  hud.update(sim, meta.best);
+  hud.update(s, meta.best);
+}
+
+function openSettings(): void {
+  renderSettings(meta.settings, (next) => {
+    meta.settings = next;
+    saveMeta(kv, meta);
+    applySettings(next);
+  });
+  show('settings', true);
 }
 
 function pause(): void {
@@ -155,10 +222,12 @@ function syncPhase(): void {
   show('upgrades', s.phase === 'levelup');
   show('shop', s.phase === 'shop');
   if (s.phase === 'levelup') {
+    saveRun(kv, s);
     app = 'levelup';
     input.mouse.down = false;
     renderLevelUp(s, (i) => { chooseLevel(s, i, events); drainEvents(); }, () => { rerollLevel(s, events); drainEvents(); });
   } else if (s.phase === 'shop') {
+    saveRun(kv, s);
     app = 'shop';
     input.mouse.down = false;
     shopView.render(s);
@@ -169,10 +238,11 @@ function syncPhase(): void {
     const opened = s.dev ? [] : recordRun(meta, {
       wave: s.wave,
       kills: s.stats.kills, scrap: s.stats.scrapCollected, guardianKills: s.stats.guardianKills,
-      won: s.phase === 'victory', score: s.score,
+      won: s.phase === 'victory', score: s.score, threat: s.threat,
     });
     saveMeta(kv, meta);
-    $('menubest').textContent = t('menu.best', { n: meta.best });
+    clearRun(kv);
+    $('menubest').textContent = t('menu.best', { n: fmtNum(meta.best) });
     renderEnd(s, meta.best, previousBest);
     renderEndExtra(s, opened);
     if (opened.length) events.push({ t: 'sfx', id: 'unlock' });
@@ -219,6 +289,13 @@ function drainEvents(): void {
   if (phase) syncPhase();
 }
 
+function musicIntensity(): number {
+  if (!sim || app === 'menu' || app === 'opselect' || app === 'over') return 0.1;
+  if (app === 'shop' || app === 'levelup') return 0.2;
+  if (sim.enemies.some((e) => isBoss(e.type))) return 1;
+  return 0.3 + Math.min(0.6, sim.enemies.length / 200);
+}
+
 // ---------- цикл ----------
 let simMs = 0;
 let renderMs = 0;
@@ -245,7 +322,8 @@ startLoop({
       toastTime -= frameDt;
       if (toastTime <= 0) $('toast').style.opacity = '0';
     }
-    $('hurt').style.opacity = String(fx.flash);
+    $('hurt').style.opacity = view.flashes ? String(fx.flash) : '0';
+    ambient.setIntensity(audio, musicIntensity());
     view.crosshair = app === 'play' && !input.touchMode;
     view.mouseX = input.mouse.x;
     view.mouseY = input.mouse.y;
@@ -308,6 +386,11 @@ $('restart').addEventListener('click', openOperatorSelect);
 $('tomenu').addEventListener('click', toMenu);
 $('opgo').addEventListener('click', start);
 $('opback').addEventListener('click', toMenu);
+$('continue').addEventListener('click', resumeRun);
+$('menusettings').addEventListener('click', openSettings);
+$('pausesettings').addEventListener('click', openSettings);
+$('setdone').addEventListener('click', () => show('settings', false));
+$('pausequit').addEventListener('click', toMenu);
 const touchFire = $('touchfire');
 touchFire.addEventListener('pointerdown', (e) => { e.preventDefault(); input.touchFire = true; touchFire.setPointerCapture(e.pointerId); });
 touchFire.addEventListener('pointerup', () => { input.touchFire = false; });

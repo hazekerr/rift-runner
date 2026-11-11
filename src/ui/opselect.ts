@@ -26,3 +26,24 @@ export function renderOperatorSelect(meta: Meta, selected: string, onSelect: (id
     root.append(card);
   }
 }
+
+/** Выбор уровня Угрозы (виден после первой победы). */
+export function renderThreat(meta: Meta, selected: number, onSelect: (n: number) => void): void {
+  const root = $('threatbox');
+  root.replaceChildren();
+  if (meta.maxThreat <= 0) {
+    root.append(h('div', 'desc', t('threat.locked')));
+    return;
+  }
+  const seg = h('div', 'seg');
+  for (let i = 0; i <= meta.maxThreat; i++) {
+    const b = h('button', i === selected ? 'on' : '', ['0', 'I', 'II', 'III', 'IV'][i]!);
+    b.setAttribute('aria-pressed', String(i === selected));
+    b.addEventListener('click', () => onSelect(i));
+    seg.append(b);
+  }
+  const lines = [h('b', '', `${t('threat.label')} ${['0', 'I', 'II', 'III', 'IV'][selected]} · ${t('threat.score', { n: 1 + 0.25 * selected })}`)];
+  for (let i = 1; i <= selected; i++) lines.push(h('div', '', `+ ${t(`threat.${i}` as I18nKey)}`));
+  if (selected === 0) lines.push(h('div', '', t('threat.0')));
+  root.append(h('div', '', t('threat.label')), seg, h('div', 'desc', ...lines, h('div', 'muted', t('threat.inherit'))));
+}
