@@ -1,3 +1,4 @@
+import { iconImg, weaponIconUrl } from './icons';
 import { RUN_WAVES, xpToNext } from '../content/balance';
 import { MAX_WEAPONS, weaponById } from '../content/weapons';
 import { RARITY_PIPS } from '../content/levelups';
@@ -70,7 +71,7 @@ export class Hud {
         const w = p.weapons[i];
         if (w) {
           const def = weaponById(w.id);
-          const b = h('div', 'weapon active', h('b', '', t(def.name)), h('small', 'pips', RARITY_PIPS[w.tier - 1]!));
+          const b = h('div', 'weapon active', iconImg(weaponIconUrl(w.id, w.tier), 26, 'hud-wicon'), h('div', '', h('b', '', t(def.name)), h('small', 'pips', RARITY_PIPS[w.tier - 1]!)));
           b.style.borderColor = def.color;
           b.style.boxShadow = `inset 0 -2px ${def.color}`;
           wrap.append(b);

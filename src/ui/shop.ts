@@ -1,3 +1,6 @@
+import { iconImg, moduleIconUrl, weaponIconUrl } from './icons';
+import { statDesc, tagDesc } from './explain';
+import type { WeaponTag } from '../content/weapons';
 import { MAX_WEAPONS, estimateDps, weaponById } from '../content/weapons';
 import { moduleById, type EffectDef, type ModuleDef } from '../content/modules';
 import { RARITY_COLOR, RARITY_PIPS } from '../content/levelups';
@@ -53,6 +56,7 @@ export function moduleLines(s: SimState, def: ModuleDef): HTMLElement[] {
     const v = m.flat ?? m.pct ?? 0;
     const unit = m.pct !== undefined ? '%' : STATS[m.stat as StatId].unit;
     const el = h('div', v >= 0 ? 'line up' : 'line down', `${v >= 0 ? '▲ +' : '▼ '}${v}${unit} ${t(STATS[m.stat].name)}`);
+    el.title = statDesc(m.stat);
     lines.push(el);
   }
   if (def.effect) lines.push(h('div', 'line fx', `◈ ${effectText(s, def.effect)}`));
@@ -68,6 +72,24 @@ export function weaponDps(s: SimState, id: string, tier: number): number {
   // Базовая оценка тира I из контента, масштабированная статами, тиром и скорострельностью
   const speedUp = def.cooldown / weaponCooldown(s, def, inst);
   return estimateDps(def) * TIER_MULT[tier - 1]! * mult * (def.kind === 'turret' ? 1 : speedUp);
+}
+
+/** Теги-кнопки: тап показывает объяснение тега прямо в карточке (на телефоне нет наведения). */
+function tagRow(tags: readonly WeaponTag[]): HTMLElement {
+  const note = h('div', 'tag-note hidden');
+  const row = h('div', 'tags', ...tags.map((tag) => {
+    const b = h('button', 'tag', t(`tag.${tag}` as I18nKey));
+    b.title = tagDesc(tag);
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const same = note.dataset.tag === tag && !note.classList.contains('hidden');
+      note.dataset.tag = tag;
+      note.textContent = `${tagDesc(tag)} ${t('tagdesc.hint')}`;
+      note.classList.toggle('hidden', same);
+    });
+    return b;
+  }));
+  return h('div', '', row, note);
 }
 
 export class ShopView {
@@ -133,21 +155,19 @@ export class ShopView {
     let blocked = '';
     if (o.kind === 'weapon') {
       const def = weaponById(o.id);
-      const sym = h('span', 'symbol', '▮');
-      sym.style.color = def.color;
-      body.push(sym, h('b', 'oname', t(def.name)), h('div', 'otype', t('shop.weapon', { n: RARITY_PIPS[o.tier - 1]! })));
+      body.push(h('div', 'ohead', iconImg(weaponIconUrl(o.id, o.tier), 48, 'offer-icon'), h('div', '', h('b', 'oname', t(def.name)), h('div', 'otype', t('shop.weapon', { n: RARITY_PIPS[o.tier - 1]! })))));
       body.push(h('p', 'odesc', t(def.desc)));
       body.push(h('div', 'line', t('shop.dps', { n: Math.round(weaponDps(s, o.id, o.tier)), r: Math.round(weaponRange(s, def)) })));
-      body.push(h('div', 'tags', ...def.tags.map((tag) => h('span', '', t(`tag.${tag}` as I18nKey)))));
+      body.push(tagRow(def.tags));
       if (s.p.weapons.some((w) => w.id === o.id && w.tier === o.tier) && o.tier < 4) {
         body.push(h('div', 'badge', t('shop.merge', { n: RARITY_PIPS[o.tier]! })));
       }
       if (!canTakeWeapon(s, o.id, o.tier)) blocked = t('shop.noSlot');
     } else {
       const def = moduleById(o.id);
-      body.push(h('b', 'oname', t(def.name)), h('div', 'otype', `${t('shop.module')}${def.max ? ` · ${t('shop.uniq')}` : ''}${moduleCount(s.p, def.id) ? ` · ×${moduleCount(s.p, def.id)}` : ''}`));
+      body.push(h('div', 'ohead', iconImg(moduleIconUrl(def.id), 48, 'offer-icon'), h('div', '', h('b', 'oname', t(def.name)), h('div', 'otype', `${t('shop.module')}${def.max ? ` · ${t('shop.uniq')}` : ''}${moduleCount(s.p, def.id) ? ` · ×${moduleCount(s.p, def.id)}` : ''}`))));
       body.push(h('div', 'olines', ...moduleLines(s, def)));
-      if (def.tags.length) body.push(h('div', 'tags', ...def.tags.map((tag) => h('span', '', t(`tag.${tag}` as I18nKey)))));
+      if (def.tags.length) body.push(tagRow(def.tags));
       if (def.max && moduleCount(s.p, def.id) >= def.max) blocked = t('shop.max');
     }
     const buy = h('button', 'buy', blocked || t('shop.buy', { n: o.price }));
@@ -176,7 +196,7 @@ export class ShopView {
       const w = s.p.weapons[k];
       if (!w) { root.append(h('div', 'arm empty', t('shop.empty'))); continue; }
       const def = weaponById(w.id);
-      const name = h('span', 'arm-name', `${t(def.name)} `, h('em', '', RARITY_PIPS[w.tier - 1]!));
+      const name = h('span', 'arm-name', iconImg(weaponIconUrl(w.id, w.tier), 22, 'arm-icon'), `${t(def.name)} `, h('em', '', RARITY_PIPS[w.tier - 1]!));
       name.style.color = def.color;
       const row = h('div', 'arm', name, h('span', 'arm-dps', `${Math.round(weaponDps(s, w.id, w.tier))} DPS`));
       if (mergePartner(s.p.weapons, w)) {
@@ -199,7 +219,7 @@ export class ShopView {
     if (!s.p.modules.length) { root.append(h('div', 'muted', t('shop.noModules'))); return; }
     for (const m of s.p.modules) {
       const def = moduleById(m.id);
-      const chip = h('span', 'chip', `${RARITY_PIPS[def.rarity]} ${t(def.name)}${m.count > 1 ? ` ×${m.count}` : ''}`);
+      const chip = h('span', 'chip', iconImg(moduleIconUrl(m.id), 18, 'chip-icon'), `${t(def.name)}${m.count > 1 ? ` ×${m.count}` : ''}`);
       chip.style.borderColor = RARITY_COLOR[def.rarity]!;
       chip.title = [...def.mods.map((x) => `${(x.flat ?? x.pct ?? 0) > 0 ? '+' : ''}${x.flat ?? x.pct}${x.pct !== undefined ? '%' : STATS[x.stat].unit} ${t(STATS[x.stat].name)}`), def.effect ? effectText(s, def.effect) : ''].filter(Boolean).join('\n');
       root.append(chip);

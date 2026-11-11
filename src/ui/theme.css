@@ -126,3 +126,18 @@
   .utility{top:60px}.score-box strong{font-size:20px}
 }
 button:focus-visible,[data-nav]:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+
+/* ---- Иконки и пояснения ---- */
+.card-icon{display:block;margin:4px 0 14px;image-rendering:auto}
+.card .card-desc{font-size:11px;line-height:1.5;color:#8ea3a9;margin:8px 0 0}
+.ohead{display:flex;gap:10px;align-items:center}.offer-icon{flex:none}
+.offer .tags{align-items:center}.offer .tag{border:1px solid #34424a;background:transparent;font:9px monospace;letter-spacing:1px;padding:3px 6px;color:#9fb2b6;cursor:help}
+.offer .tag:hover,.offer .tag:focus-visible{border-color:var(--rar);color:var(--white)}
+.tag-note{margin-top:6px;font-size:10px;line-height:1.5;color:#c6d3d4;border-left:2px solid var(--rar);padding-left:8px}
+.arm-name{display:flex;align-items:center;gap:6px}.arm-icon{flex:none}
+.chip{display:inline-flex;align-items:center;gap:5px}.chip-icon{flex:none}
+.stat-icon{flex:none;width:16px;height:16px}
+.stat-desc{margin:0 0 6px;color:#c6d3d4;line-height:1.5}
+.weapon{display:flex;align-items:center;gap:8px}.hud-wicon{flex:none}
+@media(max-width:740px){.hud-wicon{display:none}}
+@media(pointer:coarse) and (max-height:500px){.hud-wicon{display:none}}

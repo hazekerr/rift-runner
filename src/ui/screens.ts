@@ -1,3 +1,5 @@
+import { iconImg, statIconUrl } from './icons';
+import { statDesc } from './explain';
 import { WEAPONS } from '../content/weapons';
 import { operatorById } from '../content/operators';
 import { moduleById } from '../content/modules';
@@ -22,9 +24,9 @@ export function renderLevelUp(s: SimState, onPick: (i: number) => void, onReroll
     const color = RARITY_COLOR[o.rarity]!;
     const rar = h('div', 'rar', h('span', '', t(`rarity.${o.rarity}` as I18nKey)), h('span', '', RARITY_PIPS[o.rarity]!));
     rar.style.color = color;
-    const sym = h('span', 'symbol', meta.glyph);
-    sym.style.color = color;
-    const card = h('button', 'card', rar, sym, h('b', '', t(meta.name)), h('span', 'val', fmtStat(o.stat, o.value)));
+    const icon = iconImg(statIconUrl(o.stat), 44, 'card-icon');
+    const card = h('button', 'card', rar, icon, h('b', '', t(meta.name)), h('span', 'val', fmtStat(o.stat, o.value)), h('p', 'card-desc', statDesc(o.stat)));
+    card.title = statDesc(o.stat);
     card.style.borderColor = o.rarity ? color : '';
     card.addEventListener('click', () => onPick(i));
     cards.append(card);

@@ -1,3 +1,5 @@
+import { iconImg, statIconUrl } from './icons';
+import { statDesc } from './explain';
 import { STATS, STAT_IDS, type StatId } from '../content/stats';
 import { moduleById } from '../content/modules';
 import { t } from '../i18n';
@@ -45,7 +47,8 @@ export function renderStats(root: HTMLElement, p: Player, open: Set<StatId>, pre
     const row = h('button', 'stat-row');
     const val = h('span', 'stat-val', fmtStatValue(id, v));
     const extra = h('span', 'stat-note', note(id, v));
-    row.append(h('span', 'stat-glyph', meta.glyph), h('span', 'stat-name', t(meta.name)), extra, val);
+    row.append(iconImg(statIconUrl(id), 16, 'stat-icon'), h('span', 'stat-name', t(meta.name)), extra, val);
+    row.title = statDesc(id);
     if (preview) {
       const d = round(preview[id] - v);
       if (d !== 0) {
@@ -63,6 +66,7 @@ export function renderStats(root: HTMLElement, p: Player, open: Set<StatId>, pre
     root.append(row);
     if (open.has(id)) {
       const box = h('div', 'stat-breakdown');
+      box.append(h('p', 'stat-desc', statDesc(id)));
       for (const line of breakdown(p.mods, id)) {
         const parts: string[] = [];
         if (line.flat) parts.push(`${line.flat > 0 && line.source.kind !== 'base' ? '+' : ''}${round(line.flat)}`);
