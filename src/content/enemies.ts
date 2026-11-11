@@ -1,6 +1,6 @@
 import type { I18nKey } from '../i18n';
 
-export type EnemyType = 'drone' | 'runner' | 'gunner' | 'tank' | 'splitter' | 'shard' | 'miner' | 'healer' | 'swarm' | 'boss';
+export type EnemyType = 'drone' | 'runner' | 'gunner' | 'tank' | 'splitter' | 'shard' | 'miner' | 'healer' | 'swarm' | 'boss' | 'heart';
 export type Aura = 'haste' | 'shield' | 'regen';
 
 export interface EnemyDef {
@@ -34,7 +34,13 @@ export const ENEMIES: Record<EnemyType, EnemyDef> = {
   healer: { type: 'healer', name: 'e.healer', hp: 45, contact: 5, shotDmg: 0, speed: 95, r: 16, scrap: 3, scrapChance: 1, points: 90, color: '#5fe0a0', sides: 8 },
   swarm: { type: 'swarm', name: 'e.swarm', hp: 6, contact: 4, shotDmg: 0, speed: 170, r: 8, scrap: 1, scrapChance: 0.5, points: 10, color: '#ffd166', sides: 3 },
   boss: { type: 'boss', name: 'e.boss', hp: 3200, contact: 20, shotDmg: 10, speed: 72, r: 45, scrap: 60, scrapChance: 1, points: 1500, color: '#ff5f78', sides: 8 },
+  heart: { type: 'heart', name: 'e.heart', hp: 9000, contact: 24, shotDmg: 9, speed: 55, r: 58, scrap: 120, scrapChance: 1, points: 5000, color: '#ff3d6e', sides: 12 },
 };
+
+/** Боссы: не лечатся хилерами, не добиваются «Палачом», у них своя полоса HP. */
+export const isBoss = (t: EnemyType): boolean => t === 'boss' || t === 'heart';
+/** «Бронированные» цели для правила Сварщика. */
+export const isArmored = (t: EnemyType, elite: boolean): boolean => elite || t === 'tank' || isBoss(t);
 
 export const ELITE = { hp: 4, dmg: 1.3, size: 1.35, scrap: 8, points: 5, auraRange: 150 } as const;
 export const AURA_GLYPH: Record<Aura, string> = { haste: '»', shield: '◆', regen: '✚' };

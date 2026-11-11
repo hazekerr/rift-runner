@@ -2,6 +2,8 @@ import { TAU, clamp, dist } from '../core/math';
 import { range } from '../core/rng';
 import { AURA_COLOR, ELITE, HEAL_PER_SEC, HEAL_RANGE, MINE, RUNNER_DASH } from '../content/enemies';
 import { segRect } from './collide';
+import { updateBoss } from './bosses';
+import { isBoss } from '../content/enemies';
 import { hurtPlayer } from './combat';
 import type { EventSink } from './events';
 import type { Enemy, SimState } from './state';
@@ -14,7 +16,7 @@ function enemyShot(s: SimState, e: Enemy, angle: number, speed: number, dmg: num
   s.bullets.push({
     x, y, px: x, py: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 5,
     damage: dmg, crit: false, r: boss ? 7 : 6, color: boss ? '#ff6888' : '#d79aff', friendly: false, pierce: 0, hit: [],
-    weapon: '', source: e.type,
+    weapon: '', source: e.type, explodeR: 0, burnChance: 0, slowPct: 0,
   });
 }
 
@@ -36,7 +38,7 @@ function applySupport(s: SimState, dt: number, ev: EventSink): void {
       src.aiT -= dt;
       enemyHash.queryCircle(src.x, src.y, HEAL_RANGE, (i) => {
         const o = s.enemies[i]!;
-        if (o === src || o.dead || o.type === 'boss' || dist(o, src) > HEAL_RANGE) return;
+        if (o === src || o.dead || isBoss(o.type) || dist(o, src) > HEAL_RANGE) return;
         o.hp = Math.min(o.maxHp, o.hp + HEAL_PER_SEC * (src.maxHp / 45) * dt);
       });
       if (src.aiT <= 0) {
@@ -61,7 +63,12 @@ export function updateEnemies(s: SimState, dt: number, ev: EventSink): void {
     const dy = p.y - e.y;
     const d = Math.hypot(dx, dy) || 1;
     const a = Math.atan2(dy, dx);
-    let speed = e.speed * (e.hasted ? 1.3 : 1) * (s.overtime && e.type === 'boss' ? 1.3 : 1) * (e.slow > 0 ? 1 - e.slowPct / 100 : 1);
+    if (isBoss(e.type)) {
+      updateBoss(s, e, dt, ev);
+      if (d < e.r + p.r + 4) hurtPlayer(s, e.contact, e.type, ev);
+      continue;
+    }
+    let speed = e.speed * (e.hasted ? 1.3 : 1) * (e.slow > 0 ? 1 - e.slowPct / 100 : 1);
 
     // Раннер: погоня → замах (телеграф) → рывок → откат
     if (e.type === 'runner') {
@@ -107,7 +114,6 @@ export function updateEnemies(s: SimState, dt: number, ev: EventSink): void {
       vx += Math.cos(e.phase * 3 + e.id) * 0.5;
       vy += Math.sin(e.phase * 3 + e.id) * 0.5;
     }
-    if (e.type === 'boss' && d < 260) { vx *= 0.3; vy *= 0.3; }
     const reach = los ? 70 : 12;
     for (const o of s.obstacles) {
       const qx = clamp(e.x, o.x, o.x + o.w);
@@ -134,17 +140,10 @@ export function updateEnemies(s: SimState, dt: number, ev: EventSink): void {
     if (d < e.r + p.r + 4) hurtPlayer(s, e.contact, e.type, ev);
 
     // Стрельба и мины
-    if (e.type === 'gunner' || e.type === 'boss' || e.type === 'miner') {
-      e.shot -= dt * (e.type === 'boss' && s.overtime ? 1.5 : 1);
+    if (e.type === 'gunner' || e.type === 'miner') {
+      e.shot -= dt;
       if (e.shot < 0 && d < 1100) {
-        if (e.type === 'boss') {
-          const spd = 225 + s.wave * 4;
-          for (let i = 0; i < 14; i++) enemyShot(s, e, (i * TAU) / 14 + e.phase * 0.4, spd, e.shotDmg);
-          for (let i = -1; i <= 1; i++) enemyShot(s, e, a + i * 0.18, 340, e.shotDmg * 1.2);
-          e.shot = 1.9;
-          ev.push({ t: 'ring', x: e.x, y: e.y, color: '#ff6888', max: 100, life: 0.3 });
-          ev.push({ t: 'sfx', id: 'bossVolley' });
-        } else if (e.type === 'miner') {
+        if (e.type === 'miner') {
           s.mines.push({ x: e.x, y: e.y, arm: MINE.arm, life: MINE.life, damage: e.shotDmg });
           e.shot = MINE.every + range(s.rng.combat, -0.4, 0.4);
           ev.push({ t: 'sfx', id: 'mineArm' });
