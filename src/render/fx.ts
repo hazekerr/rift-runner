@@ -6,7 +6,7 @@ import type { SimEvent } from '../sim/events';
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; color: string }
 interface Ring { x: number; y: number; color: string; r: number; max: number; life: number; total: number }
 interface Floater { x: number; y: number; text: string; color: string; life: number; big: boolean }
-interface Beam { pts: number[]; color: string; life: number; total: number }
+interface Beam { pts: number[]; color: string; life: number; total: number; straight: boolean }
 interface Swing { x: number; y: number; a: number; arc: number; r: number; color: string; life: number }
 
 const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
@@ -16,7 +16,7 @@ export class Fx {
   particles = new Pool<Particle>(2048, () => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 0.65, r: 1, color: '' }));
   rings = new Pool<Ring>(128, () => ({ x: 0, y: 0, color: '', r: 0, max: 0, life: 0, total: 1 }));
   floaters = new Pool<Floater>(256, () => ({ x: 0, y: 0, text: '', color: '', life: 0, big: false }));
-  beams = new Pool<Beam>(64, () => ({ pts: [], color: '', life: 0, total: 1 }));
+  beams = new Pool<Beam>(64, () => ({ pts: [], color: '', life: 0, total: 1, straight: false }));
   swings = new Pool<Swing>(64, () => ({ x: 0, y: 0, a: 0, arc: 0, r: 0, color: '', life: 0 }));
   /** Trauma ∈ [0,1] (Eiserloh): смещение = MAX_SHAKE · t² · shakeScale. */
   trauma = 0;
@@ -73,7 +73,7 @@ export class Fx {
         break;
       case 'beam': {
         const q = this.beams.spawn();
-        q.pts = e.pts; q.color = e.color; q.life = e.life; q.total = e.life;
+        q.pts = e.pts; q.color = e.color; q.life = e.life; q.total = e.life; q.straight = !!e.straight;
         break;
       }
       case 'swing': {

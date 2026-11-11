@@ -95,7 +95,7 @@ describe('sim: волны по таймеру', () => {
     for (let i = 0; i < 61 * 60; i++) step(s, emptyInput(), DT, ev);
     expect(s.overtime).toBe(true);
     expect(s.phase).toBe('play');
-    const boss = s.enemies.find((e) => e.type === 'boss')!;
+    const boss = s.enemies.find((e) => e.type === 'heart')!;
     damageEnemy(s, boss, boss.hp * 10, false, 'test', ev); // ×10: рядом может быть элита с аурой щита
     for (let i = 0; i < 5 && s.phase === 'play'; i++) step(s, emptyInput(), DT, ev);
     expect(s.phase).toBe('victory');

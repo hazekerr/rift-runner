@@ -39,6 +39,18 @@ const PATCHES: Record<SfxId, Patch> = {
   mineBoom: (a) => { a.noise(0.12, 0.2); a.tone(70, 0.25, 'sine', 0.08, 30); },
   split: (a) => a.tone(600, 0.08, 'triangle', 0.03, 300),
   error: (a) => a.tone(120, 0.12, 'square', 0.04),
+  'shoot.rocket': (a, p) => { a.noise(0.06, 0.12); a.tone(160 * p, 0.22, 'sawtooth', 0.03, 60); },
+  'shoot.flamer': (a) => a.noise(0.02, 0.06),
+  'shoot.cryo': (a, p) => a.tone(1600 * p, 0.08, 'sine', 0.02, 900),
+  'shoot.mortar': (a, p) => { a.tone(140 * p, 0.12, 'triangle', 0.05, 70); a.noise(0.04, 0.06); },
+  'shoot.laser': (a, p) => a.tone(1100 * p, 0.2, 'sawtooth', 0.03, 300),
+  explode: (a) => { a.noise(0.1, 0.18); a.tone(80, 0.2, 'sine', 0.06, 30); },
+  turretDeploy: (a) => { a.tone(500, 0.08, 'square', 0.03, 900); a.tone(900, 0.06, 'square', 0.02); },
+  teleWarn: (a) => a.tone(880, 0.12, 'square', 0.025, 660),
+  bossLaser: (a) => { a.tone(220, 0.45, 'sawtooth', 0.07, 110); a.noise(0.08, 0.3); },
+  bossSlam: (a) => { a.noise(0.25, 0.3); a.tone(55, 0.5, 'sine', 0.12, 25); },
+  synergy: (a) => { a.tone(660, 0.1, 'triangle', 0.05, 990); a.tone(990, 0.18, 'triangle', 0.04, 1320); },
+  unlock: (a) => { a.tone(440, 0.15, 'triangle', 0.06, 880); a.tone(660, 0.3, 'triangle', 0.05, 1320); },
 };
 
 const recent = new Map<SfxId, number[]>();

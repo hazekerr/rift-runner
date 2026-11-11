@@ -1,4 +1,4 @@
-import { MAX_WEAPONS, weaponById } from '../content/weapons';
+import { MAX_WEAPONS, estimateDps, weaponById } from '../content/weapons';
 import { moduleById, type EffectDef, type ModuleDef } from '../content/modules';
 import { RARITY_COLOR, RARITY_PIPS } from '../content/levelups';
 import { STATS, type StatId } from '../content/stats';
@@ -10,6 +10,7 @@ import { canTakeWeapon, currentReroll, mergePartner, sellValue } from '../sim/sh
 import { moduleCount, type ShopOffer, type SimState } from '../sim/state';
 import { weaponCooldown, weaponRange } from '../sim/weapons';
 import { $, h } from './dom';
+import { TAG_ORDER } from '../content/synergies';
 import { renderStats } from './statspanel';
 
 export interface ShopActions {
@@ -64,7 +65,9 @@ export function weaponDps(s: SimState, id: string, tier: number): number {
   const cls = def.dmgClass === 'melee' ? st.meleeDmg : def.dmgClass === 'ranged' ? st.rangedDmg : st.energyDmg;
   const mult = Math.max(0.1, 1 + (st.damage + cls) / 100) * (1 + (Math.min(100, st.crit) / 100) * 0.5);
   const inst = { uid: 0, id, tier, cd: 0, aim: 0, flash: 0, x: 0, y: 0 };
-  return (def.damage * TIER_MULT[tier - 1]! * (def.pellets ?? 1) * mult) / weaponCooldown(s, def, inst);
+  // Базовая оценка тира I из контента, масштабированная статами, тиром и скорострельностью
+  const speedUp = def.cooldown / weaponCooldown(s, def, inst);
+  return estimateDps(def) * TIER_MULT[tier - 1]! * mult * (def.kind === 'turret' ? 1 : speedUp);
 }
 
 export class ShopView {
@@ -88,7 +91,22 @@ export class ShopView {
     grid.replaceChildren(...s.shop.offers.map((o, i) => this.offerCard(s, o, i)));
     this.renderArsenal(s);
     this.renderModules(s);
+    this.renderSynergies(s);
     this.renderStatList(s);
+  }
+
+  private renderSynergies(s: SimState): void {
+    const root = $('synlist');
+    root.replaceChildren();
+    for (const tag of TAG_ORDER) {
+      const n = s.p.tags[tag];
+      if (!n) continue;
+      const next = n >= 6 ? 6 : n >= 3 ? 6 : 3;
+      const active = n >= 3;
+      const desc = n >= 6 ? `${t(`syn.${tag}.3` as I18nKey)}; ${t(`syn.${tag}.6` as I18nKey)}` : active ? t(`syn.${tag}.3` as I18nKey) : `→ ${t(`syn.${tag}.3` as I18nKey)}`;
+      root.append(h('div', `syn${active ? ' on' : ''}`, h('b', '', t(`tagname.${tag}` as I18nKey)), h('span', 'cnt', t('syn.row', { n, m: next })), h('span', 'desc', desc)));
+    }
+    if (!root.childElementCount) root.append(h('div', 'muted', t('syn.none')));
   }
 
   private previewStats(s: SimState): ReturnType<typeof computeStats> | null {

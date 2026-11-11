@@ -2,7 +2,7 @@ import './ui/theme.css';
 import { PRODUCT } from './config';
 import { startLoop } from './core/loop';
 import { Input } from './core/input';
-import { applyDom, t } from './i18n';
+import { applyDom, t, type I18nKey } from './i18n';
 import { AudioEngine } from './audio/engine';
 import { playSfx } from './audio/bank';
 import { Renderer, type ViewState } from './render/renderer';
@@ -13,16 +13,18 @@ import { chooseLevel, leaveShop, rerollLevel } from './sim/waves';
 import { buyOffer, mergeWeapon, rerollShop, sellWeapon, toggleLock } from './sim/shop';
 import type { SimEvent } from './sim/events';
 import type { SimState } from './sim/state';
-import { loadMeta, saveMeta, storage } from './save/meta';
+import { loadMeta, recordRun, saveMeta, storage } from './save/meta';
+import { renderOperatorSelect } from './ui/opselect';
+import { operatorById } from './content/operators';
 import { $ } from './ui/dom';
 import { Hud } from './ui/hud';
-import { renderEnd, renderLevelUp } from './ui/screens';
+import { renderEnd, renderEndExtra, renderLevelUp } from './ui/screens';
 import { ShopView } from './ui/shop';
 import { renderStats } from './ui/statspanel';
 import type { StatId } from './content/stats';
 import { DevPanel } from './ui/devpanel';
 
-type AppState = 'menu' | 'play' | 'paused' | 'levelup' | 'shop' | 'over';
+type AppState = 'menu' | 'opselect' | 'play' | 'paused' | 'levelup' | 'shop' | 'over';
 
 const kv = storage();
 const meta = loadMeta(kv);
@@ -87,15 +89,38 @@ function show(id: string, on: boolean): void {
   $(id).classList.toggle('hidden', !on);
 }
 
+let selectedOp = meta.lastOperator;
+
+/** Экран выбора оператора (из меню и после забега). */
+function openOperatorSelect(): void {
+  audio.init();
+  app = 'opselect';
+  for (const id of ['menu', 'gameover', 'hud', 'utility', 'touchcontrols']) show(id, false);
+  if (!meta.unlocked.includes(selectedOp)) selectedOp = 'operator';
+  const rerender = (): void => renderOperatorSelect(meta, selectedOp, (id) => { selectedOp = id; rerender(); });
+  rerender();
+  show('opselect', true);
+}
+
+function toMenu(): void {
+  app = 'menu';
+  sim = null;
+  for (const id of ['gameover', 'opselect', 'hud', 'utility', 'touchcontrols', 'upgrades', 'shop', 'pausemenu']) show(id, false);
+  show('menu', true);
+}
+
 function start(): void {
   audio.init();
+  meta.lastOperator = selectedOp;
+  saveMeta(kv, meta);
   previousBest = meta.best;
   input.reset();
   fx.clear();
   events.length = 0;
-  sim = startRun((Math.random() * 2 ** 32) >>> 0, events);
+  sim = startRun((Math.random() * 2 ** 32) >>> 0, events, selectedOp);
   camera.snap(sim.p.x, sim.p.y);
-  for (const id of ['menu', 'gameover', 'pausemenu', 'upgrades', 'shop']) show(id, false);
+  for (const id of ['menu', 'gameover', 'pausemenu', 'upgrades', 'shop', 'opselect']) show(id, false);
+  $('touchfire').classList.toggle('hidden', !operatorById(selectedOp).rule.manualOnly);
   for (const id of ['hud', 'utility', 'touchcontrols']) show(id, true);
   app = 'play';
   drainEvents();
@@ -140,12 +165,17 @@ function syncPhase(): void {
   } else if (s.phase === 'over' || s.phase === 'victory') {
     app = 'over';
     input.mouse.down = false;
-    if (s.score > meta.best) {
-      meta.best = s.score;
-      saveMeta(kv, meta);
-    }
+    // забеги с dev-панелью не идут в мета-статистику и открытия
+    const opened = s.dev ? [] : recordRun(meta, {
+      wave: s.wave,
+      kills: s.stats.kills, scrap: s.stats.scrapCollected, guardianKills: s.stats.guardianKills,
+      won: s.phase === 'victory', score: s.score,
+    });
+    saveMeta(kv, meta);
     $('menubest').textContent = t('menu.best', { n: meta.best });
     renderEnd(s, meta.best, previousBest);
+    renderEndExtra(s, opened);
+    if (opened.length) events.push({ t: 'sfx', id: 'unlock' });
     show('gameover', true);
   } else if (s.phase === 'play' && app !== 'paused') {
     if (app !== 'play') camera.snap(s.p.x, s.p.y);
@@ -167,7 +197,16 @@ function drainEvents(): void {
   for (const e of events) {
     switch (e.t) {
       case 'sfx': playSfx(audio, e.id, e.v); break;
-      case 'toast': notify(t(e.key, e.params), t(e.sub, e.params), e.duration); break;
+      case 'toast': {
+        // параметры с суффиксом Key — это ключи словаря, переводим их здесь (сим не знает про язык)
+        const params: Record<string, string | number> = {};
+        for (const [k, v] of Object.entries(e.params)) {
+          if (k.endsWith('Key')) params[k.slice(0, -3)] = t(v as I18nKey);
+          else params[k] = v;
+        }
+        notify(t(e.key, params), t(e.sub, params), e.duration);
+        break;
+      }
       case 'phase': phase = true; break;
       case 'hitstop':
         // Хитстоп только на крупных событиях, глобальный КД 250 мс (скилл game-feel)
@@ -220,7 +259,8 @@ startLoop({
 
 // ---------- ввод ----------
 input.onPadStart = () => {
-  if (app === 'menu' || app === 'over') start();
+  if (app === 'menu' || app === 'over') openOperatorSelect();
+  else if (app === 'opselect') start();
   else pause();
 };
 addEventListener('keydown', (e) => {
@@ -230,7 +270,8 @@ addEventListener('keydown', (e) => {
   if (e.code === 'F1') { dev.toggle(); return; }
   if (e.code === 'Escape' || e.code === 'KeyP') { pause(); return; }
   if (e.code === 'KeyM') { toggleSound(); return; }
-  if (app === 'menu' && e.code === 'Enter') { start(); return; }
+  if (app === 'menu' && e.code === 'Enter') { openOperatorSelect(); return; }
+  if (app === 'opselect' && e.code === 'Enter') { start(); return; }
   if (app !== 'play') return;
   if (e.code === 'Space') input.press('dash');
   if (e.code === 'KeyQ') input.press('pulse');
@@ -262,8 +303,15 @@ addEventListener('pointerup', () => { input.mouse.down = false; });
 addEventListener('pointercancel', () => { input.mouse.down = false; });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-$('start').addEventListener('click', start);
-$('restart').addEventListener('click', start);
+$('start').addEventListener('click', openOperatorSelect);
+$('restart').addEventListener('click', openOperatorSelect);
+$('tomenu').addEventListener('click', toMenu);
+$('opgo').addEventListener('click', start);
+$('opback').addEventListener('click', toMenu);
+const touchFire = $('touchfire');
+touchFire.addEventListener('pointerdown', (e) => { e.preventDefault(); input.touchFire = true; touchFire.setPointerCapture(e.pointerId); });
+touchFire.addEventListener('pointerup', () => { input.touchFire = false; });
+touchFire.addEventListener('pointercancel', () => { input.touchFire = false; });
 $('resume').addEventListener('click', pause);
 $('pause').addEventListener('click', pause);
 $('sound').addEventListener('click', toggleSound);
@@ -302,6 +350,8 @@ stickEl.addEventListener('pointercancel', stickEnd);
 (window as unknown as { __rr: unknown }).__rr = {
   get sim() { return sim; },
   get app() { return app; },
+  get meta() { return meta; },
+  start: (op: string) => { selectedOp = op; start(); },
   chooseLevel: (i: number) => { if (sim) { chooseLevel(sim, i, events); drainEvents(); } },
   buy: (i: number) => { if (sim) { buyOffer(sim, i, events); drainEvents(); } },
   leaveShop: () => { if (sim) { leaveShop(sim, events); drainEvents(); } },

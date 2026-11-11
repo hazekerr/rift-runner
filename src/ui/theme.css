@@ -74,3 +74,22 @@
   .term-head h2{font-size:20px}
 }
 @media(max-width:520px){.offer-grid{grid-template-columns:1fr}.offer{min-height:0}}
+
+/* ---- Этап 4 ---- */
+.ops-panel{max-width:1100px}
+.ops{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:24px;text-align:left}
+.op{border:1px solid #2f3e45;border-top:3px solid var(--opc,#62ecd2);background:linear-gradient(160deg,#121e24,#0b1216);padding:14px 12px;color:#c6d3d4;font-size:11px;display:flex;flex-direction:column;gap:6px;min-height:250px;cursor:pointer}
+.op:hover{border-color:var(--opc)}.op.sel{box-shadow:0 0 0 2px var(--opc) inset}
+.op .glyph{font-size:26px;color:var(--opc)}.op b{font:800 17px Segoe UI,Arial,sans-serif;color:var(--white)}.op .role{font:9px monospace;letter-spacing:2px;color:var(--muted)}
+.op ul{margin:4px 0 0;padding-left:14px;line-height:1.45}.op .start{margin-top:auto;font:10px monospace;color:#9fb2b6}
+.op.locked{cursor:not-allowed;opacity:.55}.op.locked .glyph{color:#3f525a}.op .lockline{font:10px monospace;color:var(--orange);margin-top:auto}
+.op .bar{height:3px;background:#283238}.op .bar i{display:block;height:100%;background:var(--orange)}
+.synlist{display:flex;flex-direction:column;gap:3px;font:10px ui-monospace,monospace}
+.syn{display:flex;gap:6px;align-items:baseline;color:#6f8188}.syn b{min-width:76px;color:#9fb2b6}.syn .cnt{min-width:30px;font-weight:700}.syn.on .cnt{color:#ffd166}.syn.on b{color:var(--white)}.syn .desc{color:#8ea3a9;flex:1}
+.endextra{max-width:560px;margin:10px auto 18px;text-align:left;font:11px ui-monospace,monospace;color:#9fb2b6}
+.endextra .row{display:flex;gap:8px;align-items:center;padding:3px 0}.endextra .row span:first-child{min-width:140px}.endextra .bar{flex:1;height:6px;background:#162229}.endextra .bar i{display:block;height:100%}
+.endextra .unlock{color:#ffd166;font-weight:700;letter-spacing:1px;margin-top:8px}
+.endextra .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;text-align:center}.endextra .grid strong{display:block;font-size:16px;color:var(--white)}.endextra .grid small{font-size:9px;letter-spacing:1px;color:var(--muted)}
+#dashcharges{color:var(--cyan)}
+@media(max-width:900px){.ops{grid-template-columns:repeat(2,1fr)}.op{min-height:0}}
+@media(max-width:520px){.ops{grid-template-columns:1fr}}

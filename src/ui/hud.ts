@@ -2,7 +2,7 @@ import { RUN_WAVES, xpToNext } from '../content/balance';
 import { MAX_WEAPONS, weaponById } from '../content/weapons';
 import { RARITY_PIPS } from '../content/levelups';
 import { t } from '../i18n';
-import { isBossWave } from '../sim/waves';
+import { isBoss } from '../content/enemies';
 import { maxHpOf, type SimState } from '../sim/state';
 import { $, DirtyStyle, DirtyText, h } from './dom';
 
@@ -24,6 +24,7 @@ export class Hud {
   private pulse = new DirtyStyle($('pulsebar'), 'width');
   private bossFill = new DirtyStyle($('bossfill'), 'width');
   private bossName = new DirtyText($('bossname'));
+  private charges = new DirtyText($('dashcharges'));
   private weaponsKey = '';
   private timerClass = '';
   private lastBoss: boolean | null = null;
@@ -50,7 +51,8 @@ export class Hud {
     }
     this.scrap.set(String(s.scrap));
     this.bonus.set(s.bonusPool > 0 ? t('hud.bonus', { n: s.bonusPool }) : '');
-    this.dash.set(`${(1 - p.dashCd / p.dashMax) * 100}%`);
+    this.dash.set(`${p.dashCharges >= p.dashMaxCharges ? 100 : (1 - p.dashCd / p.dashMax) * 100}%`);
+    this.charges.set(p.dashMaxCharges > 1 ? ` ${t('hud.dashCharges', { n: p.dashCharges })}` : '');
     this.pulse.set(`${p.energy}%`);
 
     const key = p.weapons.map((w) => `${w.id}:${w.tier}`).join(',');
@@ -70,13 +72,13 @@ export class Hud {
       }
     }
 
-    const boss = s.enemies.find((e) => e.type === 'boss');
+    const boss = s.enemies.find((e) => isBoss(e.type));
     if (!!boss !== this.lastBoss) {
       this.lastBoss = !!boss;
       $('bossbar').classList.toggle('hidden', !boss);
     }
     if (boss) {
-      this.bossName.set(t(s.wave >= RUN_WAVES && isBossWave(s.wave) ? 'hud.bossFinal' : 'hud.boss'));
+      this.bossName.set(t(boss.type === 'heart' ? 'hud.bossFinal' : 'hud.boss'));
       this.bossFill.set(`${Math.max(0, (boss.hp / boss.maxHp) * 100)}%`);
     }
   }

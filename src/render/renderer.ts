@@ -3,6 +3,8 @@ import { ARENA_CENTER, WORLD, makeArena, type ObstacleDef } from '../content/are
 import { AURA_COLOR, AURA_GLYPH, ENEMIES, MINE, RUNNER_DASH } from '../content/enemies';
 import { PALETTE } from '../content/palette';
 import { weaponById } from '../content/weapons';
+import { isBoss } from '../content/enemies';
+import { bladePos } from '../sim/weapons';
 import { t } from '../i18n';
 import type { Enemy, SimState } from '../sim/state';
 import type { Camera } from './camera';
@@ -74,7 +76,10 @@ export class Renderer {
       this.drawScraps(s, alpha, now);
       this.drawPickups(s, alpha, now);
       this.drawMines(s, now);
+      this.drawTraps(s, now);
       this.drawSpawns(s);
+      this.drawTelegraphs(s, now);
+      this.drawTurrets(s);
       this.drawEnemies(s, alpha);
       this.drawBullets(s, alpha, true);
       this.drawWeaponFx(fx);
@@ -200,14 +205,112 @@ export class Renderer {
     ctx.stroke();
   }
 
+  private drawTraps(s: SimState, now: number): void {
+    const ctx = this.ctx;
+    for (const tr of s.traps) {
+      if (tr.artillery) {
+        // точка падения снаряда видна заранее, кольцо сжимается к моменту взрыва
+        const k = Math.max(0, tr.arm / 0.7);
+        ctx.strokeStyle = '#ff7547';
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(tr.x, tr.y, tr.r, 0, TAU);
+        ctx.stroke();
+        ctx.globalAlpha = 0.8;
+        ctx.beginPath();
+        ctx.arc(tr.x, tr.y, tr.r * (1 - k), 0, TAU);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else {
+        const armed = tr.arm <= 0;
+        ctx.fillStyle = armed && Math.sin(now * 0.02) > 0 ? '#ffd166' : '#7a6326';
+        this.pathPoly(ctx, tr.x, tr.y, 7, 6, 0);
+        ctx.fill();
+        ctx.strokeStyle = '#ffd16655';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(tr.x, tr.y, 24, 0, TAU);
+        ctx.stroke();
+      }
+    }
+  }
+
+  private drawTurrets(s: SimState): void {
+    const ctx = this.ctx;
+    for (const tu of s.turrets) {
+      ctx.save();
+      ctx.translate(tu.x, tu.y);
+      ctx.fillStyle = '#10232a';
+      ctx.strokeStyle = PALETTE.cyan;
+      ctx.lineWidth = 2;
+      this.pathPoly(ctx, 0, 0, 12, 4, Math.PI / 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.rotate(tu.aim);
+      ctx.fillStyle = PALETTE.cyan;
+      ctx.fillRect(0, -2.5, 16, 5);
+      ctx.restore();
+      // таймер жизни
+      ctx.strokeStyle = '#62ecd288';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(tu.x, tu.y, 17, -Math.PI / 2, -Math.PI / 2 + TAU * (tu.life / tu.total));
+      ctx.stroke();
+    }
+  }
+
+  /** Телеграфы боссов: зона/линии видны до удара, заполняются к моменту атаки. */
+  private drawTelegraphs(s: SimState, now: number): void {
+    const ctx = this.ctx;
+    for (const e of s.enemies) {
+      const tl = e.tele;
+      if (!tl) continue;
+      const k = 1 - tl.t / tl.total;
+      const blink = 0.55 + 0.45 * Math.sin(now * 0.03);
+      ctx.strokeStyle = '#ff3d6e';
+      ctx.fillStyle = '#ff3d6e';
+      if (tl.kind === 'ring') {
+        ctx.globalAlpha = 0.3 + 0.5 * k;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, tl.r + 30 * (1 - k), 0, TAU);
+        ctx.stroke();
+      } else if (tl.kind === 'circle') {
+        ctx.globalAlpha = 0.12 + 0.18 * k;
+        ctx.beginPath();
+        ctx.arc(tl.x, tl.y, tl.r, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = blink;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.arc(tl.x, tl.y, tl.r * k, 0, TAU);
+        ctx.stroke();
+      } else {
+        for (let i = 0; i < tl.count; i++) {
+          const a = tl.a + (i - (tl.count - 1) / 2) * tl.spread;
+          ctx.globalAlpha = (0.2 + 0.6 * k) * blink;
+          ctx.lineWidth = Math.max(2, (tl.r || 3) * 2 * k);
+          ctx.beginPath();
+          ctx.moveTo(e.x, e.y);
+          ctx.lineTo(e.x + Math.cos(a) * tl.len, e.y + Math.sin(a) * tl.len);
+          ctx.stroke();
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
   private drawSpawns(s: SimState): void {
     const ctx = this.ctx;
     ctx.lineWidth = 2;
     for (const sp of s.spawns) {
       ctx.globalAlpha = 0.35 + Math.sin(sp.t * 30) * 0.2;
-      ctx.strokeStyle = sp.type === 'boss' ? '#ff5f78' : sp.elite ? AURA_COLOR[sp.elite] : '#ff755e';
+      ctx.strokeStyle = isBoss(sp.type) ? '#ff5f78' : sp.elite ? AURA_COLOR[sp.elite] : '#ff755e';
       ctx.beginPath();
-      ctx.arc(sp.x, sp.y, (sp.type === 'boss' ? 50 : 22) + (1 - Math.min(1, sp.t / 0.85)) * 20, 0, TAU);
+      ctx.arc(sp.x, sp.y, (isBoss(sp.type) ? 60 : 22) + (1 - Math.min(1, sp.t / 0.85)) * 20, 0, TAU);
       ctx.moveTo(sp.x - 10, sp.y);
       ctx.lineTo(sp.x + 10, sp.y);
       ctx.moveTo(sp.x, sp.y - 10);
@@ -303,11 +406,11 @@ export class Renderer {
       ctx.ellipse(4, 8, e.r * 1.1, e.r * 0.8, 0, 0, TAU);
       ctx.fill();
       ctx.rotate(e.a);
-      const glow = e.hit > 0 || e.elite || e.type === 'boss';
+      const glow = e.hit > 0 || e.elite || isBoss(e.type);
       if (glow) { ctx.shadowColor = color; ctx.shadowBlur = e.hit > 0 ? 18 : 10; }
       ctx.strokeStyle = e.hit > 0 ? '#fff' : color;
-      ctx.fillStyle = e.hit > 0 ? '#eee' : e.type === 'boss' ? '#3c1f30' : '#29232a';
-      ctx.lineWidth = e.type === 'boss' || e.elite ? 3 : 2;
+      ctx.fillStyle = e.hit > 0 ? '#eee' : isBoss(e.type) ? '#3c1f30' : '#29232a';
+      ctx.lineWidth = isBoss(e.type) || e.elite ? 3 : 2;
       this.enemyBody(e);
       ctx.fill();
       ctx.stroke();
@@ -319,14 +422,23 @@ export class Renderer {
       } else {
         ctx.fillRect(e.r * 0.15, -3.5, e.r + 6, 7);
         ctx.beginPath();
-        ctx.arc(0, 0, e.type === 'boss' ? 12 : Math.max(3, e.r * 0.3), 0, TAU);
+        ctx.arc(0, 0, isBoss(e.type) ? e.r * 0.27 : Math.max(3, e.r * 0.3), 0, TAU);
         ctx.fill();
       }
-      if (e.type === 'boss') {
+      if (isBoss(e.type)) {
         ctx.strokeStyle = s.overtime ? '#ffffff' : '#ff8597';
         ctx.beginPath();
         ctx.arc(0, 0, e.r + 8, e.phase, e.phase + Math.PI * 1.5);
         ctx.stroke();
+        if (e.type === 'heart') {
+          // пульсирующее ядро, число колец = фаза
+          const ph = Math.max(1, e.vx);
+          for (let k = 0; k < ph; k++) {
+            ctx.beginPath();
+            ctx.arc(0, 0, e.r * (0.45 + 0.12 * k) + Math.sin(e.phase * 6) * 2, 0, TAU);
+            ctx.stroke();
+          }
+        }
       }
       ctx.restore();
       if (e.shielded) {
@@ -343,7 +455,7 @@ export class Renderer {
         ctx.textAlign = 'center';
         ctx.fillText(AURA_GLYPH[e.elite], ex, ey - e.r - 16);
       }
-      if (e.hp < e.maxHp && e.type !== 'boss') {
+      if (e.hp < e.maxHp && !isBoss(e.type)) {
         const w = Math.max(24, e.r * 2.4);
         ctx.fillStyle = '#152027';
         ctx.fillRect(ex - w / 2, ey - e.r - 11, w, 3);
@@ -432,6 +544,18 @@ export class Renderer {
       ctx.globalAlpha = q.life / q.total;
       ctx.strokeStyle = q.color;
       ctx.lineWidth = 2;
+      if (q.straight) {
+        ctx.lineWidth = 6 * (q.life / q.total) + 1;
+        ctx.beginPath();
+        ctx.moveTo(q.pts[0]!, q.pts[1]!);
+        ctx.lineTo(q.pts[2]!, q.pts[3]!);
+        ctx.stroke();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        continue;
+      }
+      ctx.lineWidth = 2;
       ctx.beginPath();
       for (let j = 0; j + 3 < q.pts.length; j += 2) {
         const x1 = q.pts[j]!, y1 = q.pts[j + 1]!, x2 = q.pts[j + 2]!, y2 = q.pts[j + 3]!;
@@ -487,6 +611,18 @@ export class Renderer {
     const dy = y - p.y;
     for (const w of p.weapons) {
       const def = weaponById(w.id);
+      if (def.kind === 'orbit') {
+        ctx.strokeStyle = def.color;
+        ctx.fillStyle = '#1b2a30';
+        ctx.lineWidth = 2;
+        for (let k = 0; k < (def.blades ?? 2); k++) {
+          const b = bladePos(s, w, def, k);
+          this.pathPoly(ctx, b.x + dx, b.y + dy, 13, 8, s.time * 20);
+          ctx.fill();
+          ctx.stroke();
+        }
+        continue;
+      }
       ctx.save();
       ctx.translate(w.x + dx, w.y + dy);
       ctx.rotate(w.aim);

@@ -1,4 +1,6 @@
 import { WEAPONS } from '../content/weapons';
+import { operatorById } from '../content/operators';
+import { moduleById } from '../content/modules';
 import { RARITY_COLOR, RARITY_PIPS } from '../content/levelups';
 import { STATS } from '../content/stats';
 import { ENEMIES } from '../content/enemies';
@@ -53,4 +55,35 @@ export function renderEnd(s: SimState, best: number, previousBest: number): void
   const def = top && WEAPONS.find((w) => w.id === top[0]);
   if (top && def) lines.push(t('over.topWeapon', { n: t(def.name), m: Math.round(top[1]).toLocaleString('ru-RU') }));
   $('overdetail').textContent = lines.join('\n');
+}
+
+/** Итоговая статистика забега: оператор, уровень, скрап, урон, разбивка урона по источникам, открытия. */
+export function renderEndExtra(s: SimState, opened: string[]): void {
+  const root = $('endextra');
+  root.replaceChildren();
+  const op = operatorById(s.operator);
+  const cell = (v: string, k: I18nKey): HTMLElement => h('div', '', h('strong', '', v), h('small', '', t(k)));
+  root.append(h('div', 'grid',
+    cell(t(op.name), 'end.operator'), cell(String(s.level), 'end.level'),
+    cell(String(s.stats.scrapCollected), 'end.scrap'), cell(String(Math.round(s.stats.damageTaken)), 'end.taken')));
+  root.append(h('div', 'term-label', t('end.weapons')));
+  const entries = Object.entries(s.stats.damageByWeapon).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const max = entries[0]?.[1] ?? 1;
+  for (const [id, v] of entries) {
+    const w = WEAPONS.find((x) => x.id === id);
+    let name = id;
+    let color = '#9fb2b6';
+    if (w) { name = t(w.name); color = w.color; }
+    else if (id === 'ability.pulse') name = t('end.src.ability');
+    else if (id.startsWith('m.')) {
+      try { name = t(moduleById(id.slice(2)).name); } catch { name = t('end.src.effect'); }
+      color = '#d8c8ff';
+    }
+    const bar = h('div', 'bar', h('i'));
+    const fill = bar.firstElementChild as HTMLElement;
+    fill.style.width = `${(v / max) * 100}%`;
+    fill.style.background = color;
+    root.append(h('div', 'row', h('span', '', name), bar, h('span', '', Math.round(v).toLocaleString('ru-RU'))));
+  }
+  for (const id of opened) root.append(h('div', 'unlock', `★ ${t('unlock.new', { n: t(operatorById(id).name) })}`));
 }
