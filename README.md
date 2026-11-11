@@ -66,9 +66,13 @@ WASD — движение · оружие стреляет само · **заж�
 
 Запись в `OPERATORS` (`src/content/operators.ts`): стартовое оружие, модификаторы, правила `rule` (флаги в `OperatorRules`), условие открытия `unlock`. Тексты — ключи `op.<id>*` в словаре. Новое правило — флаг в `OperatorRules` и его обработка в симе (поиск: `operatorById(s.operator).rule`).
 
+## Графика (спрайты «детальный неон»)
+
+Все объекты рисуются кодом один раз в offscreen-холсты (`src/render/sprites.ts`): `ENEMY_ART` по типам врагов, `WEAPON_ART` по оружию, `paintPlayer`, турель, мины, скрап, подборы. Свечение вшито в картинку (в качестве «экономия» — без него). Чтобы заменить любой спрайт рисованным артом, загрузите картинку и вызовите `renderer.sprites.put(ключ, картинка, половина_размера)` — ключи: `e:<тип>`, `w:<оружие>`, `player`, `turret`, `mine`, `scrap:<размер>`, `pickup:<heal|energy>`. Спрайты смотрят вдоль оси +x.
+
 ## Как добавить врага
 
-Запись в `ENEMIES` (`src/content/enemies.ts`) + строка в `WAVE_TABLE` (`src/content/waves.ts`) + особое поведение (если есть) в `src/sim/enemies.ts`.
+Запись в `ENEMIES` (`src/content/enemies.ts`) + строка в `WAVE_TABLE` (`src/content/waves.ts`) + рисунок в `ENEMY_ART` (`src/render/sprites.ts`) + особое поведение (если есть) в `src/sim/enemies.ts`.
 
 ## Как добавить модуль
 

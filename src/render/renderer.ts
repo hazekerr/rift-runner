@@ -5,6 +5,7 @@ import { PALETTE } from '../content/palette';
 import { weaponById } from '../content/weapons';
 import { isBoss } from '../content/enemies';
 import { bladePos } from '../sim/weapons';
+import { ENEMY_ART, enemyHalf, paintMine, paintPickup, paintPlayer, paintSawDisc, paintScrap, paintTurret, paintTurretGun, SpriteBank, WEAPON_ART, type Sprite } from './sprites';
 import { t } from '../i18n';
 import type { Enemy, SimState } from '../sim/state';
 import type { Camera } from './camera';
@@ -47,6 +48,12 @@ export class Renderer {
     this.W = innerWidth;
     this.H = innerHeight;
     this.DPR = this.lowQuality ? 1 : Math.min(devicePixelRatio || 1, 2);
+    // sprites объявлен ниже как поле: при первом resize из конструктора его ещё нет
+    if (this.sprites && (this.sprites.scale !== this.DPR || this.sprites.glow !== !this.lowQuality)) {
+      this.sprites.scale = this.DPR;
+      this.sprites.glow = !this.lowQuality;
+      this.sprites.clear();
+    }
     this.canvas.width = Math.round(this.W * this.DPR);
     this.canvas.height = Math.round(this.H * this.DPR);
     this.arenaLayer = null;
@@ -85,6 +92,9 @@ export class Renderer {
   }
 
   private flashes = true;
+  /** Смещение камеры текущего кадра (для прямого setTransform). */
+  private ox = 0;
+  private oy = 0;
 
   /** Сбросить кеш статичной арены (смена языка или качества). */
   invalidate(): void {
@@ -103,6 +113,8 @@ export class Renderer {
     const sh = fx.shake;
     const ox = Math.round(W / 2 - cx + fx.kickX + (sh ? rnd(-sh, sh) : 0));
     const oy = Math.round(H / 2 - cy + fx.kickY + (sh ? rnd(-sh, sh) : 0));
+    this.ox = ox;
+    this.oy = oy;
     ctx.save();
     ctx.translate(ox, oy);
     this.drawArena();
@@ -216,24 +228,17 @@ export class Renderer {
 
   private drawScraps(s: SimState, alpha: number, now: number): void {
     const ctx = this.ctx;
-    ctx.fillStyle = '#ffc163';
-    ctx.strokeStyle = '#6b4a1e';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
     for (const sc of s.scraps) {
       const x = lerp(sc.px, sc.x, alpha);
       const y = lerp(sc.py, sc.y, alpha);
-      const r = sc.v >= 8 ? 6 : sc.v >= 3 ? 4.5 : 3.2;
-      const a = now * 0.003 + sc.x * 0.05;
-      // ромб-болт
-      ctx.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
-      ctx.lineTo(x + Math.cos(a + 1.57) * r * 0.6, y + Math.sin(a + 1.57) * r * 0.6);
-      ctx.lineTo(x - Math.cos(a) * r, y - Math.sin(a) * r);
-      ctx.lineTo(x - Math.cos(a + 1.57) * r * 0.6, y - Math.sin(a + 1.57) * r * 0.6);
-      ctx.closePath();
+      const size = sc.v >= 8 ? 6 : sc.v >= 3 ? 4.5 : 3.4;
+      const spr = this.sprites.get(`scrap:${size}`, size + 6, (g, glow) => paintScrap(g, size, glow));
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(now * 0.002 + sc.x * 0.05);
+      ctx.drawImage(spr.canvas, -spr.half, -spr.half, spr.half * 2, spr.half * 2);
+      ctx.restore();
     }
-    ctx.fill();
-    ctx.stroke();
   }
 
   private drawTraps(s: SimState, now: number): void {
@@ -255,9 +260,10 @@ export class Renderer {
         ctx.globalAlpha = 1;
       } else {
         const armed = tr.arm <= 0;
-        ctx.fillStyle = armed && Math.sin(now * 0.02) > 0 ? '#ffd166' : '#7a6326';
-        this.pathPoly(ctx, tr.x, tr.y, 7, 6, 0);
-        ctx.fill();
+        const spr = this.sprites.get('mine', 14, (g, glow) => paintMine(g, glow));
+        ctx.globalAlpha = armed ? 0.75 + 0.25 * Math.sin(now * 0.02) : 0.5;
+        ctx.drawImage(spr.canvas, tr.x - spr.half, tr.y - spr.half, spr.half * 2, spr.half * 2);
+        ctx.globalAlpha = 1;
         ctx.strokeStyle = '#ffd16655';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -269,20 +275,15 @@ export class Renderer {
 
   private drawTurrets(s: SimState): void {
     const ctx = this.ctx;
+    const base = this.sprites.get('turret', 16, (g, glow) => paintTurret(g, glow));
+    const gun = this.sprites.get('turretGun', 20, (g) => paintTurretGun(g));
     for (const tu of s.turrets) {
+      ctx.drawImage(base.canvas, tu.x - base.half, tu.y - base.half, base.half * 2, base.half * 2);
       ctx.save();
       ctx.translate(tu.x, tu.y);
-      ctx.fillStyle = '#10232a';
-      ctx.strokeStyle = PALETTE.cyan;
-      ctx.lineWidth = 2;
-      this.pathPoly(ctx, 0, 0, 12, 4, Math.PI / 4);
-      ctx.fill();
-      ctx.stroke();
       ctx.rotate(tu.aim);
-      ctx.fillStyle = PALETTE.cyan;
-      ctx.fillRect(0, -2.5, 16, 5);
+      ctx.drawImage(gun.canvas, -gun.half, -gun.half, gun.half * 2, gun.half * 2);
       ctx.restore();
-      // таймер жизни
       ctx.strokeStyle = '#62ecd288';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -374,35 +375,19 @@ export class Renderer {
   private drawPickups(s: SimState, alpha: number, now: number): void {
     const ctx = this.ctx;
     for (const item of s.pickups) {
-      ctx.save();
-      ctx.translate(lerp(item.px, item.x, alpha), lerp(item.py, item.y, alpha));
+      const spr = this.sprites.get(`pickup:${item.type}`, 24, (g, glow) => paintPickup(g, item.type, glow));
       ctx.globalAlpha = item.life < 3 ? (Math.sin(now * 0.015) + 1) / 2 : 1;
-      ctx.shadowBlur = this.glow ? 15 : 0;
-      ctx.shadowColor = item.type === 'heal' ? PALETTE.cyan : PALETTE.violet;
-      ctx.fillStyle = ctx.shadowColor;
-      this.pathPoly(ctx, 0, 0, 12, 4, Math.PI / 4);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = '#0b1b20';
-      if (item.type === 'heal') {
-        ctx.fillRect(-6, -2, 12, 4);
-        ctx.fillRect(-2, -6, 4, 12);
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(1, -7); ctx.lineTo(-5, 1); ctx.lineTo(0, 1); ctx.lineTo(-1, 7); ctx.lineTo(5, -1); ctx.lineTo(0, -1);
-        ctx.fill();
-      }
-      ctx.restore();
+      const bob = Math.sin(now * 0.004 + item.x) * 2;
+      ctx.drawImage(spr.canvas, lerp(item.px, item.x, alpha) - spr.half, lerp(item.py, item.y, alpha) - spr.half + bob, spr.half * 2, spr.half * 2);
     }
+    ctx.globalAlpha = 1;
   }
 
-  private enemyBody(e: Enemy): void {
-    const ctx = this.ctx;
-    const def = ENEMIES[e.type];
-    if (def.sides === 0) { ctx.beginPath(); ctx.rect(-e.r, -e.r, e.r * 2, e.r * 2); }
-    else if (def.sides === 3) this.pathPoly(ctx, 0, 0, e.r + 3, 3, 0);
-    else if (def.sides === 4) this.pathPoly(ctx, 0, 0, e.r + 2, 4, 0);
-    else this.pathPoly(ctx, 0, 0, e.r, def.sides, e.phase * 0.3);
+  readonly sprites = new SpriteBank();
+
+  private enemySprite(type: keyof typeof ENEMIES): Sprite {
+    const def = ENEMIES[type];
+    return this.sprites.get(`e:${type}`, enemyHalf(def.r), (g, glow) => ENEMY_ART[type]!(g, def.r, def.color, glow));
   }
 
   private drawEnemies(s: SimState, alpha: number): void {
@@ -440,28 +425,28 @@ export class Renderer {
         ctx.fill();
         ctx.globalAlpha = 1;
       }
+      // поворот без save/restore: setTransform дешевле при сотнях врагов
+      const cos = Math.cos(e.a);
+      const sin = Math.sin(e.a);
+      const D = this.DPR;
       ctx.save();
-      ctx.translate(ex, ey);
-      ctx.rotate(e.a);
-      const glow = e.hit > 0 || e.elite || isBoss(e.type);
-      if (glow) { ctx.shadowColor = color; ctx.shadowBlur = this.glow ? e.hit > 0 ? 18 : 10 : 0; }
-      const flash = e.hit > 0 && this.flashes;
-      ctx.strokeStyle = e.hit > 0 ? '#fff' : color;
-      ctx.fillStyle = flash ? '#eee' : isBoss(e.type) ? '#3c1f30' : '#29232a';
-      ctx.lineWidth = isBoss(e.type) || e.elite ? 3 : 2;
-      this.enemyBody(e);
-      ctx.fill();
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = color;
-      if (e.type === 'healer') {
-        ctx.fillRect(-3, -9, 6, 18);
-        ctx.fillRect(-9, -3, 18, 6);
-      } else {
-        ctx.fillRect(e.r * 0.15, -3.5, e.r + 6, 7);
+      ctx.setTransform(cos * D, sin * D, -sin * D, cos * D, (ex + this.ox) * D, (ey + this.oy) * D);
+      // спрайт «детальный неон»: масштаб по фактическому радиусу (элиты крупнее)
+      const spr = this.enemySprite(e.type);
+      const k = e.r / def.r;
+      const h = spr.half * k;
+      ctx.drawImage(spr.canvas, -h, -h, h * 2, h * 2);
+      if (e.hit > 0 && this.flashes) {
+        ctx.globalAlpha = Math.min(1, e.hit / 0.06) * 0.85;
+        ctx.drawImage(this.sprites.white(`e:${e.type}`, spr).canvas, -h, -h, h * 2, h * 2);
+        ctx.globalAlpha = 1;
+      }
+      if (e.elite) {
+        ctx.strokeStyle = AURA_COLOR[e.elite];
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(0, 0, isBoss(e.type) ? e.r * 0.27 : Math.max(3, e.r * 0.3), 0, TAU);
-        ctx.fill();
+        ctx.arc(0, 0, e.r + 5, 0, TAU);
+        ctx.stroke();
       }
       if (isBoss(e.type)) {
         ctx.strokeStyle = s.overtime ? '#ffffff' : '#ff8597';
@@ -627,33 +612,32 @@ export class Renderer {
     const p = s.p;
     const x = lerp(p.px, p.x, alpha);
     const y = lerp(p.py, p.y, alpha);
-    ctx.save();
-    ctx.translate(x, y);
     ctx.fillStyle = '#03090a88';
     ctx.beginPath();
-    ctx.ellipse(3, 9, 19, 12, 0, 0, TAU);
+    ctx.ellipse(x + 3, y + 9, 19, 12, 0, 0, TAU);
     ctx.fill();
     if (p.inv > 0) {
       ctx.strokeStyle = p.dashTime > 0 ? '#aaffef' : '#62ecd277';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(0, 0, 24, 0, TAU);
+      ctx.arc(x, y, 24, 0, TAU);
       ctx.stroke();
     }
+    if (p.shield > 0) {
+      ctx.strokeStyle = '#8fd8ff';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(x, y, 28, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    const body = this.sprites.get('player', 30, (g, glow) => paintPlayer(g, glow));
+    ctx.save();
+    ctx.translate(x, y);
     ctx.rotate(p.angle);
     ctx.globalAlpha = p.inv > 0 && Math.sin(s.time * 35) > 0 ? 0.65 : 1;
-    ctx.fillStyle = '#264e50';
-    ctx.strokeStyle = '#72e8d2';
-    ctx.lineWidth = 2;
-    this.pathPoly(ctx, 0, 0, 17, 6, Math.PI / 6);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#6aefd5';
-    ctx.fillRect(1, -10, 8, 4);
-    ctx.fillStyle = '#e7f5e9';
-    ctx.beginPath();
-    ctx.arc(-3, 0, 7, 0, TAU);
-    ctx.fill();
+    ctx.drawImage(body.canvas, -body.half, -body.half, body.half * 2, body.half * 2);
     ctx.restore();
     ctx.globalAlpha = 1;
     // Оружие на орбите: у каждого свой силуэт и цвет
@@ -662,37 +646,33 @@ export class Renderer {
     for (const w of p.weapons) {
       const def = weaponById(w.id);
       if (def.kind === 'orbit') {
-        ctx.strokeStyle = def.color;
-        ctx.fillStyle = '#1b2a30';
-        ctx.lineWidth = 2;
+        const disc = this.sprites.get('saw', 18, (g, glow) => paintSawDisc(g, def.color, glow));
         for (let k = 0; k < (def.blades ?? 2); k++) {
           const b = bladePos(s, w, def, k);
-          this.pathPoly(ctx, b.x + dx, b.y + dy, 13, 8, s.time * 20);
-          ctx.fill();
-          ctx.stroke();
+          ctx.save();
+          ctx.translate(b.x + dx, b.y + dy);
+          ctx.rotate(s.time * 20);
+          ctx.drawImage(disc.canvas, -disc.half, -disc.half, disc.half * 2, disc.half * 2);
+          ctx.restore();
         }
         continue;
       }
+      const art = WEAPON_ART[w.id];
+      const spr = this.sprites.get(`w:${w.id}`, 26, (g, glow) => art?.(g, def.color, glow));
       ctx.save();
       ctx.translate(w.x + dx, w.y + dy);
       ctx.rotate(w.aim);
       const recoil = w.flash > 0 ? -3 : 0;
-      ctx.fillStyle = '#1b2a30';
-      ctx.strokeStyle = def.color;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.rect(recoil - 5, -def.look.w / 2, def.look.len + 5, def.look.w);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = def.color;
-      ctx.fillRect(recoil + def.look.len - 5, -def.look.w / 2, 5, def.look.w);
+      ctx.drawImage(spr.canvas, recoil - spr.half, -spr.half, spr.half * 2, spr.half * 2);
       // пипы тира
-      for (let k = 0; k < w.tier; k++) ctx.fillRect(recoil - 4 + k * 4, def.look.w / 2 + 2, 2, 2);
+      ctx.fillStyle = def.color;
+      for (let k = 0; k < w.tier; k++) ctx.fillRect(recoil - 4 + k * 4, 8, 2, 2);
       if (w.flash > 0) {
         ctx.globalAlpha = w.flash / 0.08;
         ctx.beginPath();
         ctx.arc(recoil + def.look.len + 3, 0, 4, 0, TAU);
         ctx.fill();
+        ctx.globalAlpha = 1;
       }
       ctx.restore();
     }
