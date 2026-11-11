@@ -240,7 +240,7 @@ export const en: Record<I18nKey, string> = {
   'shop.mergeBtn': '⇧ MERGE',
   'shop.empty': 'empty slot',
   'shop.noModules': 'no modules yet',
-  'shop.hint': 'Hover an offer to preview stat changes. Click a stat for its breakdown.',
+  'shop.hint': 'Hover an offer (tap the card on a phone) to preview stat changes. Click a stat for its breakdown.',
   'shop.uniq': 'unique',
 
   'stats.title': 'STATS',

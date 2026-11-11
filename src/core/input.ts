@@ -1,7 +1,9 @@
 import type { TickInput } from '../sim/input';
 
 /** Кнопки стандартного геймпада (W3C Standard Gamepad). */
-const PAD = { A: 0, B: 1, X: 2, Y: 3, RB: 5, RT: 7, START: 9 } as const;
+const PAD = { A: 0, B: 1, X: 2, Y: 3, RB: 5, RT: 7, START: 9, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 } as const;
+
+export type NavCmd = 'up' | 'down' | 'left' | 'right' | 'ok' | 'back';
 const DEADZONE = 0.2;
 
 /**
@@ -22,6 +24,9 @@ export class Input {
   private latch = { dash: false, pulse: false };
   /** Колбэк на Start геймпада (пауза). */
   onPadStart: (() => void) | null = null;
+  /** Навигация по меню с геймпада (вызывается только по фронту нажатия). */
+  onPadNav: ((cmd: NavCmd) => void) | null = null;
+  private stickNav = 0;
 
   press(action: 'dash' | 'pulse'): void {
     this.latch[action] = true;
@@ -58,6 +63,21 @@ export class Input {
     if (edge(PAD.A) || edge(PAD.RB)) this.latch.dash = true;
     if (edge(PAD.X) || edge(PAD.RT)) this.latch.pulse = true;
     if (edge(PAD.START)) this.onPadStart?.();
+    const nav = this.onPadNav;
+    if (nav) {
+      if (edge(PAD.UP)) nav('up');
+      if (edge(PAD.DOWN)) nav('down');
+      if (edge(PAD.LEFT)) nav('left');
+      if (edge(PAD.RIGHT)) nav('right');
+      if (edge(PAD.A)) nav('ok');
+      if (edge(PAD.B)) nav('back');
+      // левый стик как крестовина: срабатывает при выходе за порог, повтор — после возврата в центр
+      const sx = gp.axes[0] ?? 0;
+      const sy = gp.axes[1] ?? 0;
+      const dir = Math.abs(sx) > 0.6 || Math.abs(sy) > 0.6 ? (Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 4 : 3) : sy > 0 ? 2 : 1) : 0;
+      if (dir && dir !== this.stickNav) nav((['', 'up', 'down', 'left', 'right'] as const)[dir] as NavCmd);
+      this.stickNav = dir;
+    }
     this.padPrev = gp.buttons.map((b) => b.pressed);
   }
 

@@ -107,3 +107,22 @@
 .seg button.on{border-color:var(--orange);color:var(--white);box-shadow:inset 0 -2px var(--orange)}
 .threatbox{margin-top:18px;text-align:left;font:11px ui-monospace,monospace;color:#9fb2b6}
 .threatbox .seg{margin:8px 0}.threatbox .desc{line-height:1.6}.threatbox .desc b{color:var(--orange)}
+
+/* ---- Этап 6 ---- */
+.offer.previewing{border-color:var(--rar);box-shadow:inset 0 0 0 1px var(--rar)}
+/* Оверлеи выше экрана (телефон, экран оператора) прокручиваются; если помещаются — центрированы */
+.overlay{overflow-y:auto;align-items:flex-start;-webkit-overflow-scrolling:touch}
+.overlay>.panel{margin:auto}
+@media(max-width:520px){.op{padding:10px;gap:4px}.op ul{display:none}.op.sel ul{display:block}.op .glyph{font-size:20px}}
+@media(max-height:500px){.ops{grid-template-columns:repeat(5,1fr)}.op{min-height:0;padding:8px}.op ul{display:none}.op.sel ul{display:block;font-size:10px}.center-panel h2{font-size:26px;margin:6px 0}.cards{margin-top:12px}.card{min-height:0;padding:12px}.card .symbol{margin-bottom:8px}}
+/* Телефон в ландшафте: джойстик и кнопки у нижнего края, HUD оружия — между ними и компактнее */
+@media(pointer:coarse) and (max-height:500px){
+  #hud{padding:10px 16px}.brand{font-size:18px}.brand span[data-i18n]{display:none}.health{width:170px;margin-top:6px}.health .label{font-size:9px;letter-spacing:1px}
+  #stick{left:16px;bottom:16px;width:96px;height:96px}#knob{left:30px;top:30px}
+  .touch-actions{right:16px;bottom:22px}.touch-actions button{width:54px;height:54px}
+  .bottom{left:130px;right:150px;bottom:10px}.bottom>div:first-child{width:100%}
+  .weapons{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}.weapon{min-width:0;padding:5px 4px}.weapon b{font-size:7px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #scrapbox{margin-bottom:4px}#scrapbox b{font-size:15px}
+  .utility{top:60px}.score-box strong{font-size:20px}
+}
+button:focus-visible,[data-nav]:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}

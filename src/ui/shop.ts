@@ -157,6 +157,13 @@ export class ShopView {
     lock.addEventListener('click', () => this.actions.lock(i));
     card.append(...body, h('div', 'ofoot', lock, buy));
     card.addEventListener('pointerenter', () => { this.hovered = i; this.renderStatList(s); });
+    // тач: тап по карточке (не по кнопкам) включает/выключает превью статов
+    card.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('button')) return;
+      this.hovered = this.hovered === i ? null : i;
+      card.classList.toggle('previewing', this.hovered === i);
+      this.renderStatList(s);
+    });
     card.addEventListener('pointerleave', () => { this.hovered = null; this.renderStatList(s); });
     return card;
   }

@@ -16,6 +16,7 @@ import type { SimState } from './sim/state';
 import { loadMeta, recordRun, saveMeta, storage, type Settings } from './save/meta';
 import { clearRun, loadRun, saveRun } from './save/run';
 import { renderSettings } from './ui/settings';
+import { padNavigate } from './ui/padnav';
 import { Ambient } from './audio/music';
 import { isBoss } from './content/enemies';
 import { renderOperatorSelect, renderThreat } from './ui/opselect';
@@ -59,6 +60,7 @@ function applySettings(st: Settings): void {
   fx.shakeScale = st.shake;
   fx.damageNumbers = st.numbers;
   view.flashes = st.flashes;
+  fx.particleScale = st.quality === 'low' ? 0.5 : 1;
   if (renderer.lowQuality !== (st.quality === 'low')) {
     renderer.lowQuality = st.quality === 'low';
     renderer.resize();
@@ -306,6 +308,7 @@ startLoop({
   tick(dt) {
     const s = sim!;
     const t0 = performance.now();
+    dev.topUpStress(s);
     step(s, input.consume(toWorld, s.p), dt, events);
     camera.tick(s.p.x, s.p.y, dt);
     drainEvents();
@@ -336,6 +339,14 @@ startLoop({
 });
 
 // ---------- ввод ----------
+input.onPadNav = (cmd) => {
+  if (app === 'play') return;
+  padNavigate(cmd, () => {
+    if (!$('settings').classList.contains('hidden')) show('settings', false);
+    else if (app === 'opselect') toMenu();
+    else if (app === 'paused') pause();
+  });
+};
 input.onPadStart = () => {
   if (app === 'menu' || app === 'over') openOperatorSelect();
   else if (app === 'opselect') start();

@@ -16,7 +16,10 @@ export function renderOperatorSelect(meta: Meta, selected: string, onSelect: (id
     if (open) {
       card.append(h('ul', '', ...op.rules.map((r) => h('li', '', t(r)))));
       card.append(h('div', 'start', t('ops.weapon', { n: op.startWeapons.map((w) => t(weaponById(w).name)).join(', ') })));
+      card.tabIndex = 0;
+      card.dataset.nav = '1';
       card.addEventListener('click', () => onSelect(op.id));
+      card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(op.id); });
     } else {
       const [cur, need] = unlockProgress(op, meta.life);
       const bar = h('div', 'bar', h('i'));

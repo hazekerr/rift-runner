@@ -23,6 +23,8 @@ export class DevPanel {
   readonly el = $('devpanel');
   private perf = h('div', 'perf');
   visible = false;
+  /** Стресс-режим: держать 300 врагов и 1000 снарядов (600 наших с обычным пробитием, 400 вражеских). */
+  stress = false;
 
   constructor(private readonly hooks: DevHooks) {
     const btn = (label: string, fn: () => void): HTMLButtonElement => {
@@ -72,20 +74,39 @@ export class DevPanel {
         spawnEnemyNow(s, enemySel.value as EnemyType, c.x, c.y, eliteChk.checked ? 'shield' : null);
       })),
       btn(t('dev.stress'), withSim((s) => {
-        const n = 300 - s.enemies.length;
-        for (let i = 0; i < n; i++) {
-          const e = spawnEnemyNow(s, 'drone', 60 + (i * 37) % 1780, 60 + ((i * 53) % 1130), null);
-          e.hp = e.maxHp = 1e9; // стресс: враги не умирают
-        }
-        for (let i = 0; i < 1000; i++) {
-          const a = (i / 1000) * Math.PI * 2;
-          s.bullets.push({ x: s.p.x, y: s.p.y, px: s.p.x, py: s.p.y, vx: Math.cos(a) * 120, vy: Math.sin(a) * 120, life: 30, damage: 0, crit: false, color: '#75f5df', friendly: true, r: 3, pierce: 1e9, hit: [], weapon: 'dev', source: '', explodeR: 0, burnChance: 0, slowPct: 0 });
-        }
+        this.stress = !this.stress;
+        if (!this.stress) return;
+        s.god = true;
+        s.waveLeft = 1e9;
+        s.spawnAcc = -1e9;
+        s.burstsDone = 99;
       })),
       h('label', 'row', godChk, t('dev.god')),
       h('label', 'row', hbChk, t('dev.hitbox')),
       this.perf,
     );
+  }
+
+  /** Долить стресс-сцену до целевых чисел (вызывается каждый тик). */
+  topUpStress(s: SimState): void {
+    if (!this.stress) return;
+    for (let i = s.enemies.length; i < 300; i++) {
+      const e = spawnEnemyNow(s, i % 4 ? 'drone' : 'gunner', 60 + (i * 37) % 1780, 60 + ((i * 53) % 1130), null);
+      e.hp = e.maxHp = 1e9;
+    }
+    let own = 0;
+    for (const b of s.bullets) if (b.friendly) own++;
+    const foe = s.bullets.length - own;
+    const add = (friendly: boolean, n: number): void => {
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const x = friendly ? s.p.x : 60 + Math.random() * 1780;
+        const y = friendly ? s.p.y : 60 + Math.random() * 1130;
+        s.bullets.push({ x, y, px: x, py: y, vx: Math.cos(a) * 700, vy: Math.sin(a) * 700, life: 2, damage: 1, crit: false, color: friendly ? '#75f5df' : '#d79aff', friendly, r: friendly ? 3 : 6, pierce: 1, hit: [], weapon: 'dev', source: 'gunner', explodeR: 0, burnChance: 0, slowPct: 0 });
+      }
+    };
+    add(true, Math.max(0, 600 - own));
+    add(false, Math.max(0, 400 - foe));
   }
 
   toggle(): void {
