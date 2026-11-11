@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0a0e12"><title>RR</title>
+</head>
+<body>
+<canvas id="game" data-i18n-aria="app.canvas"></canvas><div id="hurt"></div>
+<div id="hud" class="hidden"><div class="top"><div><div class="brand"><span id="brand-a"></span><em id="brand-b"></em><span style="font-size:9px;letter-spacing:3px;font-weight:500;margin-left:13px;color:#82969e" data-i18n="hud.subtitle"></span></div><div class="health"><div class="label"><span data-i18n="hud.integrity"></span><span id="hptext"></span></div><div class="track"><i id="hpbar"></i></div></div></div><div class="top-center"><div id="wave"></div><div id="remaining"></div></div><div class="score-box"><strong id="score">000000</strong><small id="best"></small></div></div><div id="bossbar" class="hidden"><div class="label" data-i18n="hud.boss"></div><div class="track"><i id="bossfill"></i></div></div><div class="bottom"><div><div id="ammo"></div><div class="weapons" id="weapons"></div></div><div class="abilities"><div class="ability"><div class="label" data-i18n="hud.ability.dash"></div><div class="track"><i id="dashbar"></i></div></div><div class="ability"><div class="label" data-i18n="hud.ability.pulse"></div><div class="track"><i id="pulsebar"></i></div></div></div></div></div>
+<div id="utility" class="utility hidden"><button id="sound" class="icon-btn" data-i18n-title="hud.sound.title"></button><button id="pause" class="icon-btn" data-i18n-title="hud.pause.title">Ⅱ</button></div>
+<div id="toast"><b></b><span></span></div>
+<div id="menu" class="overlay"><div class="panel"><div class="eyebrow" data-i18n="menu.eyebrow"></div><div class="hero"><div><h1><b id="title-a" style="font-weight:inherit"></b><br><span id="title-b"></span></h1><p class="intro" data-i18n="menu.intro"></p><div class="actions"><button id="start" class="primary" data-i18n="menu.start"></button><span class="sub" data-i18n="menu.sub"></span></div><p class="touch-only hint" data-i18n="menu.touchHint"></p></div><div class="legend"><h3 data-i18n="menu.legend"></h3>
+<p><span class="key" data-i18n="menu.key.move"></span><span data-i18n="menu.legend.move"></span></p>
+<p><span class="key" data-i18n="menu.key.mouse"></span><span data-i18n="menu.legend.mouse"></span></p>
+<p><span class="key" data-i18n="menu.key.space"></span><span data-i18n="menu.legend.space"></span></p>
+<p><span class="key" data-i18n="menu.key.guns"></span><span data-i18n="menu.legend.guns"></span></p>
+<p><span class="key" data-i18n="menu.key.reload"></span><span data-i18n="menu.legend.reload"></span></p>
+<p><span class="key" data-i18n="menu.key.pulse"></span><span data-i18n="menu.legend.pulse"></span></p>
+<p><span class="key" data-i18n="menu.key.esc"></span><span data-i18n="menu.legend.esc"></span></p></div></div><div class="menu-footer"><span data-i18n="menu.footer"></span><span id="menubest"></span></div></div></div>
+<div id="pausemenu" class="overlay hidden"><div class="panel center-panel"><div class="eyebrow" data-i18n="pause.eyebrow"></div><h2 data-i18n="pause.title"></h2><p data-i18n="pause.text"></p><button id="resume" class="primary" data-i18n="pause.resume"></button><p class="hint" data-i18n="pause.hint"></p></div></div>
+<div id="upgrades" class="overlay hidden"><div class="panel center-panel"><div class="eyebrow" id="cleared"></div><h2 data-i18n="upg.title"></h2><p data-i18n="upg.text"></p><div id="cards" class="cards"></div><p class="hint" data-i18n="upg.hint"></p></div></div>
+<div id="gameover" class="overlay hidden"><div class="panel center-panel"><div class="eyebrow" data-i18n="over.eyebrow"></div><h2 data-i18n="over.title"></h2><p id="recordmsg"></p><div class="stats"><div><strong id="finalscore">0</strong><small data-i18n="over.score"></small></div><div><strong id="finalwave">1</strong><small data-i18n="over.wave"></small></div><div><strong id="finalkills">0</strong><small data-i18n="over.kills"></small></div><div><strong id="finaltime">0:00</strong><small data-i18n="over.time"></small></div></div><button id="restart" class="primary" data-i18n="over.restart"></button><p class="hint" data-i18n="over.hint"></p></div></div>
+<div id="touchcontrols" class="hidden"><div id="stick" class="touch-only"><div id="knob"></div></div><div class="touch-actions touch-only"><button id="touchdash" data-i18n="touch.dash"></button><button id="touchpulse" data-i18n="touch.pulse"></button></div></div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
