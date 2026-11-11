@@ -20,6 +20,7 @@ npm test           # vitest
 
 ```bash
 npm run build      # typecheck + сборка в dist/
+npm run build:single  # один самодостаточный файл dist-single/rift-runner.html (открывается без сервера)
 ```
 
 ## Структура
