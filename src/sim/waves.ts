@@ -14,6 +14,7 @@ import type { EventSink } from './events';
 import { maxHpOf, refreshStats, type SimState } from './state';
 import { openShop } from './shop';
 import { operatorById } from '../content/operators';
+import { threatMods } from '../content/threat';
 
 const AURAS: readonly Aura[] = ['haste', 'shield', 'regen'];
 export const isBossWave = (w: number): boolean => BOSS_WAVES.includes(w);
@@ -95,7 +96,9 @@ function spawnOne(s: SimState): void {
   const { type, pack } = pickType(s);
   if (alive(s) + pack > MAX_ALIVE) return;
   const at = edgeSpot(s);
-  const elite = pack === 1 && chance(s.rng.spawn, eliteChance(s.wave)) ? AURAS[int(s.rng.spawn, 3)]! : null;
+  const th = threatMods(s.threat);
+  const eliteP = s.wave >= th.eliteFromWave ? Math.min(0.3, Math.max(eliteChance(s.wave), th.eliteMult > 1 ? 0.03 : 0) * th.eliteMult) : 0;
+  const elite = pack === 1 && chance(s.rng.spawn, eliteP) ? AURAS[int(s.rng.spawn, 3)]! : null;
   for (let i = 0; i < pack; i++) {
     const a = (i / pack) * TAU;
     const ox = pack > 1 ? Math.cos(a) * 26 : 0;

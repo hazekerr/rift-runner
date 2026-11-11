@@ -143,6 +143,8 @@ export interface RunStats {
 export interface SimState {
   seed: number;
   operator: string;
+  /** Уровень Угрозы 0..4. */
+  threat: number;
   tick: number;
   time: number;
   phase: Phase;
@@ -204,10 +206,10 @@ export function createPlayer(operator: string): Player {
   return p;
 }
 
-export function createRun(seed: number, operator = 'operator'): SimState {
+export function createRun(seed: number, operator = 'operator', threat = 0): SimState {
   const root = createRng(seed);
   return {
-    seed, operator, tick: 0, time: 0, phase: 'play', wave: 0, waveLeft: 0, waveDuration: 0, overtime: false, waveDmgMult: 1,
+    seed, operator, threat, tick: 0, time: 0, phase: 'play', wave: 0, waveLeft: 0, waveDuration: 0, overtime: false, waveDmgMult: 1,
     spawnAcc: 0, burstsDone: 0, score: 0, combo: 0, comboTime: 0, nextId: 100,
     scrap: 0, scrapFrac: 0, bonusPool: 0, xp: 0, level: 1, pendingLevels: 0, levelOffer: [], levelRerolls: 0, shop: { offers: [], rerolls: 0 },
     harvestMult: 1,

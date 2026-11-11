@@ -22,8 +22,8 @@ import { effectScale } from './effects';
 
 const candidates: number[] = [];
 
-export function startRun(seed: number, ev: EventSink, operator = 'operator'): SimState {
-  const s = createRun(seed, operator);
+export function startRun(seed: number, ev: EventSink, operator = 'operator', threat = 0): SimState {
+  const s = createRun(seed, operator, threat);
   startWave(s, ev);
   ev.push({ t: 'sfx', id: 'start' });
   return s;

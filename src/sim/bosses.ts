@@ -10,6 +10,7 @@ import { hurtPlayer } from './combat';
 import type { EventSink } from './events';
 import type { Enemy, SimState, Telegraph } from './state';
 import { move } from './world';
+import { threatMods } from '../content/threat';
 
 type Pattern = 'volley' | 'fan' | 'charge' | 'spiral' | 'ringGap' | 'lasers' | 'summon' | 'slam';
 
@@ -35,8 +36,9 @@ function patternList(e: Enemy): readonly Pattern[] {
 function shoot(s: SimState, e: Enemy, angle: number, speed: number, dmg: number): void {
   const x = e.x + Math.cos(angle) * (e.r + 8);
   const y = e.y + Math.sin(angle) * (e.r + 8);
+  const sp = speed * threatMods(s.threat).bulletSpeedMult;
   s.bullets.push({
-    x, y, px: x, py: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 6, damage: dmg, crit: false,
+    x, y, px: x, py: y, vx: Math.cos(angle) * sp, vy: Math.sin(angle) * sp, life: 6, damage: dmg, crit: false,
     r: 7, color: e.type === 'heart' ? '#ff3d6e' : '#ff6888', friendly: false, pierce: 0, hit: [], weapon: '', source: e.type,
     explodeR: 0, burnChance: 0, slowPct: 0,
   });

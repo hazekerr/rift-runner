@@ -4,6 +4,7 @@ import { AURA_COLOR, ELITE, HEAL_PER_SEC, HEAL_RANGE, MINE, RUNNER_DASH } from '
 import { segRect } from './collide';
 import { updateBoss } from './bosses';
 import { isBoss } from '../content/enemies';
+import { threatMods } from '../content/threat';
 import { hurtPlayer } from './combat';
 import type { EventSink } from './events';
 import type { Enemy, SimState } from './state';
@@ -13,8 +14,9 @@ function enemyShot(s: SimState, e: Enemy, angle: number, speed: number, dmg: num
   const x = e.x + Math.cos(angle) * (e.r + 8);
   const y = e.y + Math.sin(angle) * (e.r + 8);
   const boss = e.type === 'boss';
+  const sp = speed * threatMods(s.threat).bulletSpeedMult;
   s.bullets.push({
-    x, y, px: x, py: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 5,
+    x, y, px: x, py: y, vx: Math.cos(angle) * sp, vy: Math.sin(angle) * sp, life: 5,
     damage: dmg, crit: false, r: boss ? 7 : 6, color: boss ? '#ff6888' : '#d79aff', friendly: false, pierce: 0, hit: [],
     weapon: '', source: e.type, explodeR: 0, burnChance: 0, slowPct: 0,
   });

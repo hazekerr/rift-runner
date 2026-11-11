@@ -10,6 +10,7 @@ import type { EventSink } from './events';
 import type { I18nKey } from '../i18n';
 import { addModule, moduleCount, refreshStats, type ShopOffer, type SimState, type WeaponInst } from './state';
 import { operatorById } from '../content/operators';
+import { threatMods } from '../content/threat';
 
 export const SHOP_SLOTS = 4;
 export const SELL_SHARE = 0.5;
@@ -51,14 +52,14 @@ function rollOffer(s: SimState): ShopOffer {
     const pool = only ? WEAPONS.filter((w) => w.tags.includes(only)) : WEAPONS;
     const def = pool[int(s.rng.offer, pool.length)]!;
     const tier = rarity + 1;
-    return { kind: 'weapon', id: def.id, tier, rarity, price: weaponPrice(tier, s.wave), locked: false };
+    return { kind: 'weapon', id: def.id, tier, rarity, price: Math.floor(weaponPrice(tier, s.wave) * threatMods(s.threat).priceMult), locked: false };
   }
   // модуль этой редкости; уникальные, которых уже максимум, не предлагаем; иначе — редкость ниже
   for (let r = rarity; r >= 0; r--) {
     const pool = MODULES.filter((m) => m.rarity === r && (!m.max || moduleCount(s.p, m.id) < m.max));
     if (pool.length) {
       const def = pool[int(s.rng.offer, pool.length)]!;
-      return { kind: 'module', id: def.id, tier: 0, rarity: r, price: modulePrice(r, s.wave), locked: false };
+      return { kind: 'module', id: def.id, tier: 0, rarity: r, price: Math.floor(modulePrice(r, s.wave) * threatMods(s.threat).priceMult), locked: false };
     }
   }
   return { kind: 'module', id: 'cell', tier: 0, rarity: 0, price: modulePrice(0, s.wave), locked: false };

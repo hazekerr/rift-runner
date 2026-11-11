@@ -3,6 +3,7 @@ import { chance, nextFloat, range } from '../core/rng';
 import { BONUS_POOL_SHARE, PLAYER_IFRAMES, enemyHpMult } from '../content/balance';
 import { ELITE, ENEMIES, isArmored, isBoss, type EnemyType } from '../content/enemies';
 import { operatorById } from '../content/operators';
+import { threatMods } from '../content/threat';
 import { PALETTE } from '../content/palette';
 import { CRIT_MULT } from '../content/stats';
 import type { WeaponDef } from '../content/weapons';
@@ -73,7 +74,7 @@ export function killEnemy(s: SimState, e: Enemy, ev: EventSink, depth = 0): void
   if (e.type === 'boss') s.stats.guardianKills++;
   s.combo = s.comboTime > 0 ? s.combo + 1 : 1;
   s.comboTime = 2.5;
-  const points = def.points * (e.elite ? ELITE.points : 1) * comboMult(s.combo);
+  const points = Math.round(def.points * (e.elite ? ELITE.points : 1) * comboMult(s.combo) * threatMods(s.threat).scoreMult);
   s.score += points;
   s.p.energy = clamp(s.p.energy + (boss ? 35 : e.elite ? 15 : 7), 0, 100);
   ev.push({ t: 'burst', x: e.x, y: e.y, color: def.color, n: boss ? 70 : e.elite ? 30 : 12, force: boss ? 400 : 200 });
@@ -116,8 +117,9 @@ export function killEnemy(s: SimState, e: Enemy, ev: EventSink, depth = 0): void
 export function spawnEnemyNow(s: SimState, type: EnemyType, x: number, y: number, elite: Enemy['elite']): Enemy {
   const def = ENEMIES[type];
   const w = Math.max(1, s.wave);
-  const hpMult = enemyHpMult(w) * (elite ? ELITE.hp : 1);
-  const dmgMult = s.waveDmgMult * (elite ? ELITE.dmg : 1);
+  const th = threatMods(s.threat);
+  const hpMult = enemyHpMult(w) * (elite ? ELITE.hp : 1) * th.hpMult;
+  const dmgMult = s.waveDmgMult * (elite ? ELITE.dmg : 1) * th.dmgMult;
   const hp = Math.round(def.hp * hpMult);
   const e: Enemy = {
     id: s.nextId++, type, elite, x, y, px: x, py: y, hp, maxHp: hp,
@@ -173,7 +175,7 @@ export function sweepScrap(s: SimState): number {
   let total = 0;
   for (const sc of s.scraps) total += sc.v;
   s.scraps.length = 0;
-  const saved = Math.floor(total * BONUS_POOL_SHARE);
+  const saved = Math.floor(total * Math.min(BONUS_POOL_SHARE, threatMods(s.threat).bonusShare));
   s.bonusPool += saved;
   return saved;
 }
