@@ -1,7 +1,7 @@
 import { TAU } from '../core/math';
 import { chance, int, nextFloat, range } from '../core/rng';
 import {
-  BOSS_WAVES, BURST_AT, HARVEST_GROWTH, MAX_ALIVE, RUN_WAVES, SPAWN_QUIET_TAIL,
+  BOSS_WAVES, BOSS_WAVE_SPAWN, BURST_AT, HARVEST_GROWTH, MAX_ALIVE, RUN_WAVES, SPAWN_QUIET_TAIL,
   eliteChance, enemyDmgMult, rarityWeights, rerollCost, spawnRate, waveTime, xpToNext,
 } from '../content/balance';
 import { ARENA_CENTER, WORLD } from '../content/arena';
@@ -126,7 +126,7 @@ export function updateWave(s: SimState, dt: number, ev: EventSink): void {
   if (!s.overtime) {
     s.waveLeft -= dt;
     if (s.waveLeft > SPAWN_QUIET_TAIL) {
-      s.spawnAcc += spawnRate(s.wave) * (boss ? 0.6 : 1) * dt;
+      s.spawnAcc += spawnRate(s.wave) * (boss ? BOSS_WAVE_SPAWN : 1) * dt;
       while (s.spawnAcc >= 1) { s.spawnAcc -= 1; spawnOne(s); }
       const progress = 1 - s.waveLeft / s.waveDuration;
       if (s.burstsDone < BURST_AT.length && progress >= BURST_AT[s.burstsDone]!) { s.burstsDone++; burst(s); }

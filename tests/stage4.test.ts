@@ -151,3 +151,15 @@ describe('регресс: босс не застревает за стеной',
     expect(Math.hypot(h.x - 630, h.y - 624)).toBeLessThan(450);
   });
 });
+
+describe('регресс: аура регенерации не лечит босса', () => {
+  it('Страж рядом с элитой-регеном не восстанавливает HP', () => {
+    const { s, ev } = arena(41);
+    s.p.weapons = [];
+    const b = spawnEnemyNow(s, 'boss', s.p.x, s.p.y - 400, null);
+    spawnEnemyNow(s, 'drone', b.x + 30, b.y, 'regen');
+    b.hp = b.maxHp * 0.5;
+    for (let i = 0; i < 120; i++) step(s, emptyInput(), DT, ev);
+    expect(b.hp).toBeLessThanOrEqual(b.maxHp * 0.5);
+  });
+});

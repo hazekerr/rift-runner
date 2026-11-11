@@ -6,6 +6,8 @@ export const RUN_WAVES = 20;
 export const BOSS_WAVES: readonly number[] = [10, 20];
 export const MAX_ALIVE = 300;
 export const SPAWN_QUIET_TAIL = 3; // секунд без спавна в конце волны
+/** Доля обычного спавна на босс-волнах (решение после баланс-прогона: 0.6 → 0.4, бой со Стражем — почти дуэль). */
+export const BOSS_WAVE_SPAWN = 0.4;
 export const BURST_AT: readonly number[] = [0.35, 0.7];
 
 export const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));

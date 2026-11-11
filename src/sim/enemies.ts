@@ -33,7 +33,7 @@ function applySupport(s: SimState, dt: number, ev: EventSink): void {
         if (!o || o === src || o.dead || dist(o, src) > ELITE.auraRange) return;
         if (src.elite === 'haste') o.hasted = true;
         else if (src.elite === 'shield') o.shielded = true;
-        else o.hp = Math.min(o.maxHp, o.hp + o.maxHp * 0.04 * dt);
+        else if (!isBoss(o.type)) o.hp = Math.min(o.maxHp, o.hp + o.maxHp * 0.04 * dt); // ауры не лечат боссов
       });
     }
     if (src.type === 'healer') {
