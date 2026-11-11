@@ -3,20 +3,22 @@ import { PRODUCT } from './config';
 import { startLoop } from './core/loop';
 import { Input } from './core/input';
 import { applyDom, t } from './i18n';
-import { PERKS } from './content/perks';
 import { AudioEngine } from './audio/engine';
 import { playSfx } from './audio/bank';
-import { Renderer } from './render/renderer';
+import { Renderer, type ViewState } from './render/renderer';
 import { Camera } from './render/camera';
 import { Fx } from './render/fx';
-import { applyPerk, startRun, step } from './sim/step';
+import { startRun, step } from './sim/step';
+import { chooseLevel, chooseSupply, rerollLevel } from './sim/waves';
 import type { SimEvent } from './sim/events';
 import type { SimState } from './sim/state';
 import { loadMeta, saveMeta, storage } from './save/meta';
-import { $, h } from './ui/dom';
+import { $ } from './ui/dom';
 import { Hud } from './ui/hud';
+import { renderEnd, renderLevelUp, renderSupply } from './ui/screens';
+import { DevPanel } from './ui/devpanel';
 
-type AppState = 'menu' | 'play' | 'paused' | 'upgrade' | 'over';
+type AppState = 'menu' | 'play' | 'paused' | 'levelup' | 'supply' | 'over';
 
 const kv = storage();
 const meta = loadMeta(kv);
@@ -27,11 +29,14 @@ const fx = new Fx();
 const audio = new AudioEngine();
 const input = new Input();
 const events: SimEvent[] = [];
+const view: ViewState = { crosshair: false, mouseX: 0, mouseY: 0, hitboxes: false, manual: false };
 
 let app: AppState = 'menu';
 let sim: SimState | null = null;
 let previousBest = meta.best;
 let toastTime = 0;
+let hitstop = 0;
+let hitstopCd = 0;
 
 // ---------- статичные тексты ----------
 document.title = t('app.title');
@@ -47,11 +52,21 @@ const updateSoundLabel = (): void => {
 };
 updateSoundLabel();
 
-const hud = new Hud((i) => {
-  if (app === 'play') input.selectWeapon(i);
+const hud = new Hud();
+addEventListener('resize', () => renderer.resize());
+
+const toWorld = (sx: number, sy: number): { x: number; y: number } => ({
+  x: sx - renderer.W / 2 + camera.x,
+  y: sy - renderer.H / 2 + camera.y,
 });
 
-addEventListener('resize', () => renderer.resize());
+const dev = new DevPanel({
+  sim: () => sim,
+  events,
+  cursorWorld: () => toWorld(input.mouse.x, input.mouse.y),
+  flush: () => drainEvents(),
+  view,
+});
 
 // ---------- переходы ----------
 function show(id: string, on: boolean): void {
@@ -66,7 +81,7 @@ function start(): void {
   events.length = 0;
   sim = startRun((Math.random() * 2 ** 32) >>> 0, events);
   camera.snap(sim.p.x, sim.p.y);
-  for (const id of ['menu', 'gameover', 'pausemenu', 'upgrades']) show(id, false);
+  for (const id of ['menu', 'gameover', 'pausemenu', 'upgrades', 'supply']) show(id, false);
   for (const id of ['hud', 'utility', 'touchcontrols']) show(id, true);
   app = 'play';
   drainEvents();
@@ -93,41 +108,35 @@ function toggleSound(): void {
   updateSoundLabel();
 }
 
-function openUpgrades(s: SimState): void {
-  app = 'upgrade';
-  input.mouse.down = false;
-  $('cleared').textContent = t('upg.cleared', { n: String(s.wave).padStart(2, '0') });
-  const cards = $('cards');
-  cards.replaceChildren();
-  for (const id of s.offer) {
-    const perk = PERKS.find((x) => x.id === id)!;
-    const button = h('button', 'card', h('span', 'symbol', perk.icon), h('b', '', t(perk.name)), h('p', '', t(perk.desc)));
-    button.addEventListener('click', () => {
-      if (app !== 'upgrade' || !sim) return;
-      applyPerk(sim, id, events);
-      show('upgrades', false);
-      app = 'play';
-      drainEvents();
-    });
-    cards.append(button);
+/** Синхронизировать экран с фазой сима. */
+function syncPhase(): void {
+  const s = sim;
+  if (!s) return;
+  show('upgrades', s.phase === 'levelup');
+  show('supply', s.phase === 'supply');
+  if (s.phase === 'levelup') {
+    app = 'levelup';
+    input.mouse.down = false;
+    renderLevelUp(s, (i) => { chooseLevel(s, i, events); drainEvents(); }, () => { rerollLevel(s, events); drainEvents(); });
+  } else if (s.phase === 'supply') {
+    app = 'supply';
+    input.mouse.down = false;
+    renderSupply(s, (id) => { chooseSupply(s, id, events); drainEvents(); });
+  } else if (s.phase === 'over' || s.phase === 'victory') {
+    app = 'over';
+    input.mouse.down = false;
+    if (s.score > meta.best) {
+      meta.best = s.score;
+      saveMeta(kv, meta);
+    }
+    $('menubest').textContent = t('menu.best', { n: meta.best });
+    renderEnd(s, meta.best, previousBest);
+    show('gameover', true);
+  } else if (s.phase === 'play' && app !== 'paused') {
+    if (app !== 'play') camera.snap(s.p.x, s.p.y);
+    app = 'play';
   }
-  show('upgrades', true);
-}
-
-function gameOver(s: SimState): void {
-  app = 'over';
-  input.mouse.down = false;
-  if (s.score > meta.best) {
-    meta.best = s.score;
-    saveMeta(kv, meta);
-  }
-  $('menubest').textContent = t('menu.best', { n: meta.best });
-  $('finalscore').textContent = s.score.toLocaleString('ru-RU');
-  $('finalwave').textContent = String(s.wave);
-  $('finalkills').textContent = String(s.kills);
-  $('finaltime').textContent = `${Math.floor(s.time / 60)}:${String(Math.floor(s.time % 60)).padStart(2, '0')}`;
-  $('recordmsg').textContent = s.score > previousBest ? t('over.record') : t('over.normal', { n: meta.best.toLocaleString('ru-RU') });
-  show('gameover', true);
+  hud.update(s, meta.best);
 }
 
 function notify(a: string, b: string, duration: number): void {
@@ -139,63 +148,77 @@ function notify(a: string, b: string, duration: number): void {
 }
 
 function drainEvents(): void {
+  let phase = false;
   for (const e of events) {
     switch (e.t) {
       case 'sfx': playSfx(audio, e.id, e.v); break;
       case 'toast': notify(t(e.key, e.params), t(e.sub, e.params), e.duration); break;
-      case 'gameover': if (sim) gameOver(sim); break;
-      case 'upgrade': if (sim) openUpgrades(sim); break;
+      case 'phase': phase = true; break;
+      case 'hitstop':
+        // Хитстоп только на крупных событиях, глобальный КД 250 мс (скилл game-feel)
+        if (hitstopCd <= 0) { hitstop = Math.max(hitstop, e.ms / 1000); hitstopCd = 0.25; }
+        break;
       default: fx.consume(e);
     }
   }
   events.length = 0;
+  if (phase) syncPhase();
 }
 
 // ---------- цикл ----------
-const toWorld = (sx: number, sy: number): { x: number; y: number } => ({
-  x: sx - renderer.W / 2 + camera.x,
-  y: sy - renderer.H / 2 + camera.y,
-});
+let simMs = 0;
+let renderMs = 0;
+let fps = 60;
 
 startLoop({
-  shouldTick: () => app === 'play' && sim !== null,
+  shouldTick: () => app === 'play' && sim !== null && hitstop <= 0,
   tick(dt) {
     const s = sim!;
-    step(s, input.consume(toWorld), dt, events);
+    const t0 = performance.now();
+    step(s, input.consume(toWorld, s.p), dt, events);
     camera.tick(s.p.x, s.p.y, dt);
     drainEvents();
     if (app === 'play') hud.update(s, meta.best);
+    simMs = simMs * 0.9 + (performance.now() - t0) * 0.1;
   },
   render(alpha, frameDt) {
-    if (app !== 'paused' && app !== 'upgrade') {
+    const t0 = performance.now();
+    input.pollGamepad();
+    hitstop = Math.max(0, hitstop - frameDt);
+    hitstopCd = Math.max(0, hitstopCd - frameDt);
+    if (app !== 'paused' && app !== 'levelup' && app !== 'supply') {
       fx.update(frameDt);
       toastTime -= frameDt;
       if (toastTime <= 0) $('toast').style.opacity = '0';
     }
     $('hurt').style.opacity = String(fx.flash);
-    renderer.draw(sim, alpha, fx, camera, {
-      crosshair: app === 'play' && !input.touchMode,
-      mouseX: input.mouse.x,
-      mouseY: input.mouse.y,
-    });
+    view.crosshair = app === 'play' && !input.touchMode;
+    view.mouseX = input.mouse.x;
+    view.mouseY = input.mouse.y;
+    view.manual = input.mouse.down;
+    renderer.draw(sim, alpha, fx, camera, view);
+    renderMs = renderMs * 0.9 + (performance.now() - t0) * 0.1;
+    if (frameDt > 0) fps = fps * 0.95 + (1 / frameDt) * 0.05;
+    dev.setPerf(simMs, renderMs, sim, fps);
   },
 });
 
 // ---------- ввод ----------
+input.onPadStart = () => {
+  if (app === 'menu' || app === 'over') start();
+  else pause();
+};
 addEventListener('keydown', (e) => {
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F1'].includes(e.code)) e.preventDefault();
   input.keys.add(e.code);
   if (e.repeat) return;
+  if (e.code === 'F1') { dev.toggle(); return; }
   if (e.code === 'Escape' || e.code === 'KeyP') { pause(); return; }
   if (e.code === 'KeyM') { toggleSound(); return; }
   if (app === 'menu' && e.code === 'Enter') { start(); return; }
   if (app !== 'play') return;
   if (e.code === 'Space') input.press('dash');
   if (e.code === 'KeyQ') input.press('pulse');
-  if (e.code === 'KeyR') input.press('reload');
-  if (e.code === 'Digit1') input.selectWeapon(0);
-  if (e.code === 'Digit2') input.selectWeapon(1);
-  if (e.code === 'Digit3') input.selectWeapon(2);
 });
 addEventListener('keyup', (e) => input.keys.delete(e.code));
 addEventListener('blur', () => {
@@ -223,12 +246,6 @@ canvas.addEventListener('pointerdown', (e) => {
 addEventListener('pointerup', () => { input.mouse.down = false; });
 addEventListener('pointercancel', () => { input.mouse.down = false; });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-canvas.addEventListener('wheel', (e) => {
-  if (app === 'play') {
-    e.preventDefault();
-    input.cycleWeapon(e.deltaY > 0 ? 1 : -1);
-  }
-}, { passive: false });
 
 $('start').addEventListener('click', start);
 $('restart').addEventListener('click', start);
@@ -266,5 +283,10 @@ stickEl.addEventListener('pointermove', (e) => { if (e.pointerId === stickPointe
 stickEl.addEventListener('pointerup', stickEnd);
 stickEl.addEventListener('pointercancel', stickEnd);
 
-// Хук для автотестов и dev-инструментов (только чтение)
-(window as unknown as { __rr: unknown }).__rr = { get sim() { return sim; }, get app() { return app; } };
+// Хук для автотестов и dev-инструментов
+(window as unknown as { __rr: unknown }).__rr = {
+  get sim() { return sim; },
+  get app() { return app; },
+  chooseLevel: (i: number) => { if (sim) { chooseLevel(sim, i, events); drainEvents(); } },
+  chooseSupply: (id: string | null) => { if (sim) { chooseSupply(sim, id, events); drainEvents(); } },
+};

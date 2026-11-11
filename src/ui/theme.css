@@ -4,3 +4,27 @@
 /* RR: переносы строк из словаря */
 .intro,.sub,.hint{white-space:pre-line}
 
+
+/* ---- Этап 2 ---- */
+.xp-label{margin-top:10px}.track.xp{height:3px}.track.xp i{background:#ffd166}
+#timer{margin-top:6px;font:700 26px/1 monospace;letter-spacing:2px;color:var(--white);font-variant-numeric:tabular-nums}
+#timer.low{color:var(--orange)}#timer.ot{color:#ff6d65}
+#scrapbox{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}#scrapbox b{font:700 22px monospace;color:#ffc163}#scrapbox small{font-size:10px;letter-spacing:2px;color:var(--muted)}#scrapbox em{font-style:normal;font-size:10px;letter-spacing:1px;color:#ffd166}.scrap-glyph{color:#ffc163;font-size:14px}
+.weapon{min-width:96px;cursor:default}.weapon .pips{color:var(--orange);letter-spacing:1px}
+.cards4{grid-template-columns:repeat(4,1fr)}
+.card .rar{display:flex;justify-content:space-between;font:700 9px monospace;letter-spacing:2px;margin-bottom:18px}
+.card .val{display:block;font:700 22px monospace;margin:4px 0 8px}
+.card .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.card .tags span{border:1px solid #34424a;font:9px monospace;letter-spacing:1px;padding:3px 5px;color:#9fb2b6}
+.row-actions{margin-top:18px;display:flex;justify-content:center;gap:12px}
+.ghost{background:transparent;border:1px solid #43545a;color:var(--white);padding:11px 18px;font:700 11px monospace;letter-spacing:2px}.ghost:hover{border-color:var(--cyan)}.ghost:disabled{opacity:.4;cursor:not-allowed}
+#devpanel{position:fixed;left:12px;top:150px;z-index:20;background:#05090ce8;border:1px solid #2b3940;padding:10px;font:11px monospace;color:#cfe;display:flex;flex-direction:column;gap:6px;width:230px;pointer-events:auto}
+#devpanel button,#devpanel select,#devpanel input{font:11px monospace;background:#10181d;color:#cfe;border:1px solid #33444a;padding:4px 6px}
+#devpanel .row{display:flex;gap:6px;align-items:center}#devpanel .perf{color:#7f9;white-space:pre-line}
+@media(max-width:740px){.cards4{grid-template-columns:repeat(2,1fr)}#timer{font-size:20px}.weapon{min-width:60px}}
+@media(max-width:740px){
+  .health .label{font-size:9px;letter-spacing:1px}
+  .bottom>div:first-child{width:100%}
+  .weapons{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;width:100%}
+  .weapon{min-width:0;padding:6px 4px}.weapon b{font-size:7px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #scrapbox{margin-bottom:8px}#scrapbox b{font-size:18px}
+}
