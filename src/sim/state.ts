@@ -1,7 +1,10 @@
 import { createRng, fork, type Rng } from '../core/rng';
 import { ARENA_CENTER, makeArena, type ObstacleDef } from '../content/arena';
 import type { Aura, EnemyType } from '../content/enemies';
-import { OPERATORS } from '../content/operators';
+import { operatorById } from '../content/operators';
+import { SYNERGIES, SYNERGY_THRESHOLDS, TAG_ORDER } from '../content/synergies';
+import { weaponById, type WeaponTag } from '../content/weapons';
+import type { EffectDef } from '../content/modules';
 import type { StatId } from '../content/stats';
 import { computeStats, type Modifier, type Stats } from './stats';
 import { aggregate, emptyFx, type FxAgg } from './effects';
@@ -25,6 +28,8 @@ export interface Player {
   x: number; y: number; px: number; py: number; r: number;
   hp: number; angle: number;
   dashCd: number; dashTime: number; dashMax: number; dx: number; dy: number;
+  /** Заряды рывка (у Призрака 2). */
+  dashCharges: number; dashMaxCharges: number;
   inv: number; energy: number;
   regenAcc: number; lifestealCd: number;
   mods: Modifier[];
@@ -37,6 +42,8 @@ export interface Player {
   shield: number;
   scrapHealAcc: number;
   zapT: number[];
+  /** Счётчики тегов (оружие + модули) для синергий. Производное, пересчитывается в refreshStats. */
+  tags: Record<WeaponTag, number>;
 }
 
 export interface Enemy {
@@ -50,12 +57,37 @@ export interface Enemy {
   hasted: boolean; shielded: boolean;
   /** Горение (DoT) и замедление от модулей. */
   burn: number; burnDps: number; slow: number; slowPct: number;
+  /** Телеграф атаки босса (для отрисовки предупреждения). */
+  tele: Telegraph | null;
+}
+
+export interface Telegraph {
+  kind: 'ring' | 'lines' | 'circle';
+  x: number; y: number;
+  /** Направление и разброс линий. */
+  a: number; spread: number; count: number; len: number;
+  r: number;
+  t: number; total: number;
 }
 
 export interface Bullet {
   x: number; y: number; px: number; py: number; vx: number; vy: number;
   life: number; damage: number; crit: boolean; color: string; friendly: boolean; r: number;
   pierce: number; hit: number[]; weapon: string; source: EnemyType | '';
+  /** Свойства оружия: взрыв при попадании, шанс поджога, замедление. */
+  explodeR: number; burnChance: number; slowPct: number;
+}
+
+/** Мина или снаряд миномёта оператора. */
+export interface Trap {
+  x: number; y: number; arm: number; life: number; damage: number; crit: boolean; r: number; weapon: string;
+  /** true — взрывается сам по окончании взвода (миномёт), false — от контакта (мина). */
+  artillery: boolean;
+}
+
+export interface Turret {
+  x: number; y: number; life: number; total: number; cd: number; rate: number; damage: number; range: number;
+  weapon: string; aim: number;
 }
 
 export interface Mine {
@@ -103,6 +135,8 @@ export interface RunStats {
   damageTaken: number;
   killedBy: EnemyType | 'mine' | '';
   scrapCollected: number;
+  /** Убито боссов: Страж (boss), Сердце (heart). */
+  guardianKills: number;
 }
 
 /** Полное состояние забега. Только plain data: сериализуется в JSON. */
@@ -124,6 +158,8 @@ export interface SimState {
   comboTime: number;
   nextId: number;
   scrap: number;
+  /** Дробный остаток подбора (множитель Мародёра). */
+  scrapFrac: number;
   bonusPool: number;
   xp: number;
   level: number;
@@ -136,27 +172,36 @@ export interface SimState {
   enemies: Enemy[];
   bullets: Bullet[];
   mines: Mine[];
+  traps: Trap[];
+  turrets: Turret[];
   scraps: Scrap[];
   pickups: Pickup[];
   spawns: SpawnMarker[];
   obstacles: ObstacleDef[];
   stats: RunStats;
   god: boolean;
+  /** Использовалась dev-панель: забег не идёт в мета-статистику. */
+  dev: boolean;
   rng: { spawn: Rng; loot: Rng; combat: Rng; offer: Rng };
 }
 
 export function createPlayer(operator: string): Player {
-  const op = OPERATORS.find((o) => o.id === operator) ?? OPERATORS[0]!;
-  const mods: Modifier[] = [];
-  const stats = computeStats(mods);
-  return {
+  const op = operatorById(operator);
+  const mods: Modifier[] = op.mods.map((m) => ({ ...m, source: { kind: 'operator' as const, id: op.id } }));
+  const charges = op.rule.dashCharges ?? 1;
+  const p: Player = {
     x: ARENA_CENTER.x, y: ARENA_CENTER.y, px: ARENA_CENTER.x, py: ARENA_CENTER.y, r: 16,
-    hp: stats.maxHp, angle: 0,
-    dashCd: 0, dashTime: 0, dashMax: 1.7, dx: 1, dy: 0, inv: 1.5, energy: 100,
+    hp: 100, angle: 0,
+    dashCd: 0, dashTime: 0, dashMax: 1.7 * (op.rule.dashCdMult ?? 1), dx: 1, dy: 0,
+    dashCharges: charges, dashMaxCharges: charges, inv: 1.5, energy: 100,
     regenAcc: 0, lifestealCd: 0,
-    mods, stats, modules: [], fx: emptyFx(), shield: 0, scrapHealAcc: 0, zapT: [],
+    mods, stats: computeStats(mods), modules: [], fx: emptyFx(), shield: 0, scrapHealAcc: 0, zapT: [],
+    tags: emptyTags(),
     weapons: op.startWeapons.map((id, i) => ({ uid: i + 1, id, tier: 1, cd: 0.3, aim: 0, flash: 0, x: ARENA_CENTER.x, y: ARENA_CENTER.y })),
   };
+  refreshStats(p);
+  p.hp = maxHpOf(p);
+  return p;
 }
 
 export function createRun(seed: number, operator = 'operator'): SimState {
@@ -164,12 +209,13 @@ export function createRun(seed: number, operator = 'operator'): SimState {
   return {
     seed, operator, tick: 0, time: 0, phase: 'play', wave: 0, waveLeft: 0, waveDuration: 0, overtime: false, waveDmgMult: 1,
     spawnAcc: 0, burstsDone: 0, score: 0, combo: 0, comboTime: 0, nextId: 100,
-    scrap: 0, bonusPool: 0, xp: 0, level: 1, pendingLevels: 0, levelOffer: [], levelRerolls: 0, shop: { offers: [], rerolls: 0 },
+    scrap: 0, scrapFrac: 0, bonusPool: 0, xp: 0, level: 1, pendingLevels: 0, levelOffer: [], levelRerolls: 0, shop: { offers: [], rerolls: 0 },
     harvestMult: 1,
-    p: createPlayer(operator), enemies: [], bullets: [], mines: [], scraps: [], pickups: [], spawns: [],
+    p: createPlayer(operator), enemies: [], bullets: [], mines: [], traps: [], turrets: [], scraps: [], pickups: [], spawns: [],
     obstacles: makeArena(),
-    stats: { kills: 0, damageByWeapon: {}, damageTaken: 0, killedBy: '', scrapCollected: 0 },
+    stats: { kills: 0, damageByWeapon: {}, damageTaken: 0, killedBy: '', scrapCollected: 0, guardianKills: 0 },
     god: false,
+    dev: false,
     rng: { spawn: fork(root), loot: fork(root), combat: fork(root), offer: fork(root) },
   };
 }
@@ -177,8 +223,26 @@ export function createRun(seed: number, operator = 'operator'): SimState {
 /** Пересчитать статы после изменения модификаторов (HP растёт вместе с максимумом). */
 export function refreshStats(p: Player): void {
   const oldMax = p.stats.maxHp;
+  // Синергии тегов: пересобрать модификаторы с источником 'tag'
+  p.tags = countTags(p);
+  p.mods = p.mods.filter((m) => m.source.kind !== 'tag');
+  const extra: EffectDef[] = [];
+  const flags = { pierceBonus: 0, explodeRadiusMult: 1, turretLifeMult: 1, burnMult: 1 };
+  for (const tag of TAG_ORDER) {
+    SYNERGY_THRESHOLDS.forEach((need, k) => {
+      if (p.tags[tag] < need) return;
+      const tier = SYNERGIES[tag][k]!;
+      for (const m of tier.mods) p.mods.push({ ...m, source: { kind: 'tag', id: `${tag}:${need}` } });
+      if (tier.effects) extra.push(...tier.effects);
+      const f = tier.flags;
+      if (f?.pierceBonus) flags.pierceBonus += f.pierceBonus;
+      if (f?.explodeRadiusMult) flags.explodeRadiusMult *= f.explodeRadiusMult;
+      if (f?.turretLifeMult) flags.turretLifeMult *= f.turretLifeMult;
+      if (f?.burnMult) flags.burnMult *= f.burnMult;
+    });
+  }
   p.stats = computeStats(p.mods);
-  p.fx = aggregate(p.modules);
+  p.fx = { ...aggregate(p.modules, extra), ...flags };
   const maxHp = Math.max(1, Math.round(p.stats.maxHp));
   if (maxHp > oldMax) p.hp += maxHp - oldMax;
   p.hp = Math.min(p.hp, maxHp);
@@ -197,3 +261,13 @@ export function addModule(p: Player, id: string): void {
 }
 
 export const moduleCount = (p: Player, id: string): number => p.modules.find((m) => m.id === id)?.count ?? 0;
+
+export const emptyTags = (): Record<WeaponTag, number> => ({ melee: 0, ballistic: 0, energy: 0, explosive: 0, turret: 0, element: 0 });
+
+/** Теги: каждое оружие считается раз, модули — по числу копий. */
+export function countTags(p: Player): Record<WeaponTag, number> {
+  const out = emptyTags();
+  for (const w of p.weapons) for (const t of weaponById(w.id).tags) out[t]++;
+  for (const m of p.modules) for (const t of moduleById(m.id).tags) out[t] += m.count;
+  return out;
+}

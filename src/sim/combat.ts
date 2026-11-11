@@ -1,7 +1,8 @@
 import { TAU, clamp } from '../core/math';
 import { chance, nextFloat, range } from '../core/rng';
 import { BONUS_POOL_SHARE, PLAYER_IFRAMES, enemyHpMult } from '../content/balance';
-import { ELITE, ENEMIES, type EnemyType } from '../content/enemies';
+import { ELITE, ENEMIES, isArmored, isBoss, type EnemyType } from '../content/enemies';
+import { operatorById } from '../content/operators';
 import { PALETTE } from '../content/palette';
 import { CRIT_MULT } from '../content/stats';
 import type { WeaponDef } from '../content/weapons';
@@ -22,7 +23,8 @@ export function rollWeaponDamage(s: SimState, def: WeaponDef, inst: WeaponInst):
   const low = p.fx.lowHpDmg.pct && p.hp < maxHpOf(p) * (p.fx.lowHpDmg.below / 100) ? p.fx.lowHpDmg.pct : 0;
   const mult = Math.max(0.1, 1 + (st.damage + cls + low) / 100);
   const crit = chance(s.rng.combat, clamp(st.crit, 0, 100) / 100);
-  return { dmg: def.damage * TIER_MULT[inst.tier - 1]! * mult * (crit ? CRIT_MULT : 1), crit };
+  const manual = operatorById(s.operator).rule.manualOnly ?? 1;
+  return { dmg: def.damage * TIER_MULT[inst.tier - 1]! * mult * manual * (crit ? CRIT_MULT : 1), crit };
 }
 
 export function dropScrap(s: SimState, x: number, y: number, value: number): void {
@@ -43,7 +45,9 @@ export function dropScrap(s: SimState, x: number, y: number, value: number): voi
  */
 export function damageEnemy(s: SimState, e: Enemy, raw: number, crit: boolean, weapon: string, ev: EventSink, showNumber = true, depth = 0): void {
   if (e.dead) return;
-  const dmg = e.shielded ? raw * 0.6 : raw;
+  const armored = depth === 0 ? operatorById(s.operator).rule.armoredBonus ?? 0 : 0;
+  const bonus = armored && isArmored(e.type, !!e.elite) ? 1 + armored / 100 : 1;
+  const dmg = (e.shielded ? raw * 0.6 : raw) * bonus;
   e.hp -= dmg;
   e.hit = 0.06;
   s.stats.damageByWeapon[weapon] = (s.stats.damageByWeapon[weapon] ?? 0) + Math.min(dmg, dmg + e.hp);
@@ -64,8 +68,9 @@ export function killEnemy(s: SimState, e: Enemy, ev: EventSink, depth = 0): void
   if (e.dead) return;
   e.dead = true;
   const def = ENEMIES[e.type];
-  const boss = e.type === 'boss';
+  const boss = isBoss(e.type);
   s.stats.kills++;
+  if (e.type === 'boss') s.stats.guardianKills++;
   s.combo = s.comboTime > 0 ? s.combo + 1 : 1;
   s.comboTime = 2.5;
   const points = def.points * (e.elite ? ELITE.points : 1) * comboMult(s.combo);
@@ -118,8 +123,12 @@ export function spawnEnemyNow(s: SimState, type: EnemyType, x: number, y: number
     id: s.nextId++, type, elite, x, y, px: x, py: y, hp, maxHp: hp,
     r: def.r * (elite ? ELITE.size : 1), speed: def.speed, contact: def.contact * dmgMult, shotDmg: def.shotDmg * dmgMult,
     shot: range(s.rng.spawn, 0.8, 2), hit: 0, a: 0, dead: false, phase: range(s.rng.spawn, 0, TAU),
-    ai: 0, aiT: 0, vx: 0, vy: 0, hasted: false, shielded: false, burn: 0, burnDps: 0, slow: 0, slowPct: 0,
+    ai: 0, aiT: 0, vx: 0, vy: 0, hasted: false, shielded: false, burn: 0, burnDps: 0, slow: 0, slowPct: 0, tele: null,
   };
+  if (isBoss(type)) {
+    e.aiT = 1.5;
+    e.shot = 0; // у боссов shot — счётчик ротации паттернов
+  }
   s.enemies.push(e);
   return e;
 }
@@ -135,7 +144,8 @@ export function hurtPlayer(s: SimState, raw: number, source: EnemyType | 'mine',
     ev.push({ t: 'sfx', id: 'dodge' });
     return;
   }
-  const dmg = Math.max(1, Math.round(raw * armorMult(p.stats.armor)));
+  const armor = operatorById(s.operator).rule.armorDisabled ? 0 : p.stats.armor;
+  const dmg = Math.max(1, Math.round(raw * armorMult(armor)));
   p.hp -= dmg;
   p.inv = PLAYER_IFRAMES;
   s.stats.damageTaken += dmg;

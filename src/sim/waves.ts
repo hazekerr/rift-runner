@@ -5,7 +5,7 @@ import {
   eliteChance, enemyDmgMult, rarityWeights, rerollCost, spawnRate, waveTime, xpToNext,
 } from '../content/balance';
 import { ARENA_CENTER, WORLD } from '../content/arena';
-import { ENEMIES, type Aura, type EnemyType } from '../content/enemies';
+import { ENEMIES, isBoss, type Aura, type EnemyType } from '../content/enemies';
 import { LEVEL_UPS } from '../content/levelups';
 import { waveWeights } from '../content/waves';
 import { circleRect } from './collide';
@@ -13,6 +13,7 @@ import { spawnEnemyNow, sweepScrap } from './combat';
 import type { EventSink } from './events';
 import { maxHpOf, refreshStats, type SimState } from './state';
 import { openShop } from './shop';
+import { operatorById } from '../content/operators';
 
 const AURAS: readonly Aura[] = ['haste', 'shield', 'regen'];
 export const isBossWave = (w: number): boolean => BOSS_WAVES.includes(w);
@@ -37,11 +38,14 @@ export function startWave(s: SimState, ev: EventSink): void {
   p.y = p.py = ARENA_CENTER.y;
   p.inv = 1.0;
   p.dashCd = 0;
+  p.dashCharges = p.dashMaxCharges;
+  s.traps.length = 0;
+  s.turrets.length = 0;
   for (const w of p.weapons) w.cd = 0.3;
   p.shield = p.fx.waveShield;
   p.zapT = p.fx.zaps.map(() => 0.5);
   if (isBossWave(s.wave)) {
-    s.spawns.push({ type: 'boss', x: ARENA_CENTER.x, y: 90, t: 1.5, elite: null });
+    s.spawns.push({ type: s.wave >= RUN_WAVES ? 'heart' : 'boss', x: ARENA_CENTER.x, y: 110, t: 1.5, elite: null });
     ev.push({ t: 'toast', key: s.wave >= RUN_WAVES ? 'toast.final' : 'toast.boss', sub: 'toast.boss.sub', params: { n: s.wave }, duration: 3 });
     ev.push({ t: 'sfx', id: 'bossSpawn' });
   } else {
@@ -134,7 +138,7 @@ export function updateWave(s: SimState, dt: number, ev: EventSink): void {
     }
   }
   if (s.waveLeft <= 0) {
-    const bossAlive = s.enemies.some((e) => e.type === 'boss' && !e.dead) || s.spawns.some((x) => x.type === 'boss');
+    const bossAlive = s.enemies.some((e) => isBoss(e.type) && !e.dead) || s.spawns.some((x) => isBoss(x.type));
     if (boss && bossAlive) {
       if (s.wave >= RUN_WAVES) {
         // Решение A: финальный босс — овертайм с яростью до победы или смерти
@@ -162,6 +166,8 @@ export function endWave(s: SimState, ev: EventSink): void {
   s.spawns.length = 0;
   s.bullets.length = 0;
   s.mines.length = 0;
+  s.traps.length = 0;
+  s.turrets.length = 0;
   s.pickups.length = 0;
   const saved = sweepScrap(s);
   const harvest = Math.floor(Math.max(0, s.p.stats.harvest) * s.harvestMult);
@@ -190,7 +196,11 @@ function intermission(s: SimState): void {
 export function gainScrap(s: SimState, v: number, ev: EventSink, useBonus = true): void {
   const bonus = useBonus ? Math.min(s.bonusPool, v) : 0;
   s.bonusPool -= bonus;
-  const total = v + bonus;
+  const mult = useBonus ? operatorById(s.operator).rule.scrapMult ?? 1 : 1;
+  // Мародёр: +50% к подбору; дробная часть накапливается детерминированно
+  s.scrapFrac += (v + bonus) * mult;
+  const total = Math.floor(s.scrapFrac);
+  s.scrapFrac -= total;
   s.scrap += total;
   s.xp += total;
   s.stats.scrapCollected += total;

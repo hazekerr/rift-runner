@@ -7,7 +7,9 @@ import { rarityWeights, rerollCost } from '../content/balance';
 import { MODULES, MODULE_PRICE, WEAPON_PRICE, moduleById } from '../content/modules';
 import { MAX_WEAPONS, WEAPONS } from '../content/weapons';
 import type { EventSink } from './events';
-import { addModule, moduleCount, type ShopOffer, type SimState, type WeaponInst } from './state';
+import type { I18nKey } from '../i18n';
+import { addModule, moduleCount, refreshStats, type ShopOffer, type SimState, type WeaponInst } from './state';
+import { operatorById } from '../content/operators';
 
 export const SHOP_SLOTS = 4;
 export const SELL_SHARE = 0.5;
@@ -44,7 +46,10 @@ function rollRarity(s: SimState): number {
 function rollOffer(s: SimState): ShopOffer {
   const rarity = rollRarity(s);
   if (chance(s.rng.offer, WEAPON_OFFER_CHANCE)) {
-    const def = WEAPONS[int(s.rng.offer, WEAPONS.length)]!;
+    // Сварщик и др.: только оружие с нужным тегом
+    const only = operatorById(s.operator).rule.onlyTag;
+    const pool = only ? WEAPONS.filter((w) => w.tags.includes(only)) : WEAPONS;
+    const def = pool[int(s.rng.offer, pool.length)]!;
     const tier = rarity + 1;
     return { kind: 'weapon', id: def.id, tier, rarity, price: weaponPrice(tier, s.wave), locked: false };
   }
@@ -110,6 +115,7 @@ export function mergeWeapon(s: SimState, uid: number, ev: EventSink): boolean {
   ws.splice(ws.indexOf(partner), 1);
   w.tier++;
   w.cd = 0.3;
+  refreshStats(s.p);
   ev.push({ t: 'sfx', id: 'levelUp' });
   ev.push({ t: 'phase' });
   return true;
@@ -132,13 +138,18 @@ export function buyOffer(s: SimState, i: number, ev: EventSink): boolean {
       const partner = s.p.weapons.find((w) => w.id === o.id && w.tier === o.tier)!;
       partner.tier++;
     } else s.p.weapons.push(inst);
+    const before = { ...s.p.tags };
+    refreshStats(s.p);
+    synergyToasts(s, before, ev);
   } else {
     const def = moduleById(o.id);
     if (def.max && moduleCount(s.p, o.id) >= def.max) {
       ev.push({ t: 'sfx', id: 'error' });
       return false;
     }
+    const before = { ...s.p.tags };
     addModule(s.p, o.id);
+    synergyToasts(s, before, ev);
   }
   s.scrap -= o.price;
   s.shop.offers[i] = null;
@@ -155,8 +166,22 @@ export function sellWeapon(s: SimState, uid: number, ev: EventSink): boolean {
     return false;
   }
   ws.splice(ws.indexOf(w), 1);
+  refreshStats(s.p);
   s.scrap += sellValue(w.tier, s.wave);
   ev.push({ t: 'sfx', id: 'scrap' });
   ev.push({ t: 'phase' });
   return true;
+}
+
+/** Сообщить о новых активных порогах синергий. */
+function synergyToasts(s: SimState, before: Record<string, number>, ev: EventSink): void {
+  for (const [tag, n] of Object.entries(s.p.tags)) {
+    const was = before[tag] ?? 0;
+    for (const need of [3, 6]) {
+      if (was < need && n >= need) {
+        ev.push({ t: 'toast', key: 'syn.on', sub: `syn.${tag}.${need}` as I18nKey, params: { nKey: `tagname.${tag}`, m: need }, duration: 2.2 });
+        ev.push({ t: 'sfx', id: 'synergy' });
+      }
+    }
+  }
 }

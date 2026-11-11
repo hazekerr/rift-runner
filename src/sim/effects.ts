@@ -5,8 +5,9 @@
 import { TAU } from '../core/math';
 import { chance } from '../core/rng';
 import { enemyHpMult } from '../content/balance';
-import { moduleById } from '../content/modules';
+import { moduleById, type EffectDef } from '../content/modules';
 import { PALETTE } from '../content/palette';
+import { isBoss } from '../content/enemies';
 import type { EventSink } from './events';
 import { maxHpOf, type Enemy, type SimState } from './state';
 import { enemyHash, MAX_ENEMY_R, nearestEnemy } from './world';
@@ -27,6 +28,11 @@ export interface FxAgg {
   scrapOnKill: number;
   killHeal: { chance: number; amount: number };
   execute: number;
+  /** Флаги синергий. */
+  pierceBonus: number;
+  explodeRadiusMult: number;
+  turretLifeMult: number;
+  burnMult: number;
 }
 
 export const emptyFx = (): FxAgg => ({
@@ -34,14 +40,18 @@ export const emptyFx = (): FxAgg => ({
   burn: { chance: 0, dps: 0, dur: 0 }, slow: { chance: 0, pct: 0, dur: 0 }, scrapHealEvery: 0, energyOnKill: 0,
   lowHpDmg: { pct: 0, below: 0 }, critArc: { targets: 0, pct: 0 }, zaps: [], dashReset: { chance: 0, sec: 0 },
   scrapOnKill: 0, killHeal: { chance: 0, amount: 0 }, execute: 0,
+  pierceBonus: 0, explodeRadiusMult: 1, turretLifeMult: 1, burnMult: 1,
 });
 
 /** Сложить эффекты всех модулей (копии стакаются). */
-export function aggregate(modules: ReadonlyArray<{ id: string; count: number }>): FxAgg {
+export function aggregate(modules: ReadonlyArray<{ id: string; count: number }>, extra: readonly EffectDef[] = []): FxAgg {
   const a = emptyFx();
+  const list: Array<{ e: EffectDef; count: number }> = extra.map((e) => ({ e, count: 1 }));
   for (const { id, count } of modules) {
     const e = moduleById(id).effect;
-    if (!e) continue;
+    if (e) list.push({ e, count });
+  }
+  for (const { e, count } of list) {
     for (let i = 0; i < count; i++) {
       switch (e.kind) {
         case 'killExplode': a.killExplode.chance += e.chance; a.killExplode.r = Math.max(a.killExplode.r, e.r); a.killExplode.dmg = Math.max(a.killExplode.dmg, e.dmg); break;
@@ -89,7 +99,7 @@ export function onHit(s: SimState, e: Enemy, dmg: number, crit: boolean, ev: Eve
   const fx = s.p.fx;
   if (fx.burn.chance && chance(s.rng.combat, fx.burn.chance / 100)) {
     e.burn = fx.burn.dur;
-    e.burnDps = fx.burn.dps * effectScale(s);
+    e.burnDps = fx.burn.dps * effectScale(s) * fx.burnMult;
   }
   if (fx.slow.chance && chance(s.rng.combat, fx.slow.chance / 100)) {
     e.slow = fx.slow.dur;
@@ -110,7 +120,7 @@ export function onHit(s: SimState, e: Enemy, dmg: number, crit: boolean, ev: Eve
     }
     if (pts.length > 2) ev.push({ t: 'beam', pts, color: '#8fd8ff', life: 0.12 });
   }
-  if (fx.execute > 0 && !e.dead && e.type !== 'boss' && e.hp > 0 && e.hp / e.maxHp < fx.execute / 100) {
+  if (fx.execute > 0 && !e.dead && !isBoss(e.type) && e.hp > 0 && e.hp / e.maxHp < fx.execute / 100) {
     dmgFn(s, e, e.hp + 1, false, 'm.executioner', ev, false, 1);
   }
 }
@@ -141,7 +151,7 @@ export function onDash(s: SimState, ev: EventSink): void {
     const a = (i / n) * TAU;
     s.bullets.push({
       x: s.p.x, y: s.p.y, px: s.p.x, py: s.p.y, vx: Math.cos(a) * 700, vy: Math.sin(a) * 700, life: 0.4,
-      damage: dmg, crit: false, color: PALETTE.cyan, friendly: true, r: 3, pierce: 2, hit: [], weapon: 'm.nova', source: '',
+      damage: dmg, crit: false, color: PALETTE.cyan, friendly: true, r: 3, pierce: 2, hit: [], weapon: 'm.nova', source: '', explodeR: 0, burnChance: 0, slowPct: 0,
     });
   }
 }
