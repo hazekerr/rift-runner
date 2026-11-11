@@ -4,6 +4,8 @@ import type { Aura, EnemyType } from '../content/enemies';
 import { OPERATORS } from '../content/operators';
 import type { StatId } from '../content/stats';
 import { computeStats, type Modifier, type Stats } from './stats';
+import { aggregate, emptyFx, type FxAgg } from './effects';
+import { moduleById } from '../content/modules';
 
 export interface WeaponInst {
   uid: number;
@@ -28,6 +30,13 @@ export interface Player {
   mods: Modifier[];
   stats: Stats;
   weapons: WeaponInst[];
+  /** Купленные модули (копии стакаются). */
+  modules: Array<{ id: string; count: number }>;
+  /** Агрегированные эффекты модулей (производное от modules, пересчитывается в refreshStats). */
+  fx: FxAgg;
+  shield: number;
+  scrapHealAcc: number;
+  zapT: number[];
 }
 
 export interface Enemy {
@@ -39,6 +48,8 @@ export interface Enemy {
   ai: number; aiT: number; vx: number; vy: number;
   /** Временные баффы от аур (сбрасываются каждый тик). */
   hasted: boolean; shielded: boolean;
+  /** Горение (DoT) и замедление от модулей. */
+  burn: number; burnDps: number; slow: number; slowPct: number;
 }
 
 export interface Bullet {
@@ -63,7 +74,22 @@ export interface SpawnMarker {
   type: EnemyType; x: number; y: number; t: number; elite: Aura | null;
 }
 
-export type Phase = 'play' | 'levelup' | 'supply' | 'over' | 'victory';
+export type Phase = 'play' | 'levelup' | 'shop' | 'over' | 'victory';
+
+export interface ShopOffer {
+  kind: 'weapon' | 'module';
+  id: string;
+  /** Тир оружия (1..4) или 0 для модуля. */
+  tier: number;
+  rarity: number;
+  price: number;
+  locked: boolean;
+}
+
+export interface ShopState {
+  offers: Array<ShopOffer | null>;
+  rerolls: number;
+}
 
 export interface LevelOffer {
   stat: StatId;
@@ -104,7 +130,7 @@ export interface SimState {
   pendingLevels: number;
   levelOffer: LevelOffer[];
   levelRerolls: number;
-  supplyOffer: string[];
+  shop: ShopState;
   harvestMult: number;
   p: Player;
   enemies: Enemy[];
@@ -128,7 +154,7 @@ export function createPlayer(operator: string): Player {
     hp: stats.maxHp, angle: 0,
     dashCd: 0, dashTime: 0, dashMax: 1.7, dx: 1, dy: 0, inv: 1.5, energy: 100,
     regenAcc: 0, lifestealCd: 0,
-    mods, stats,
+    mods, stats, modules: [], fx: emptyFx(), shield: 0, scrapHealAcc: 0, zapT: [],
     weapons: op.startWeapons.map((id, i) => ({ uid: i + 1, id, tier: 1, cd: 0.3, aim: 0, flash: 0, x: ARENA_CENTER.x, y: ARENA_CENTER.y })),
   };
 }
@@ -138,7 +164,7 @@ export function createRun(seed: number, operator = 'operator'): SimState {
   return {
     seed, operator, tick: 0, time: 0, phase: 'play', wave: 0, waveLeft: 0, waveDuration: 0, overtime: false, waveDmgMult: 1,
     spawnAcc: 0, burstsDone: 0, score: 0, combo: 0, comboTime: 0, nextId: 100,
-    scrap: 0, bonusPool: 0, xp: 0, level: 1, pendingLevels: 0, levelOffer: [], levelRerolls: 0, supplyOffer: [],
+    scrap: 0, bonusPool: 0, xp: 0, level: 1, pendingLevels: 0, levelOffer: [], levelRerolls: 0, shop: { offers: [], rerolls: 0 },
     harvestMult: 1,
     p: createPlayer(operator), enemies: [], bullets: [], mines: [], scraps: [], pickups: [], spawns: [],
     obstacles: makeArena(),
@@ -152,9 +178,22 @@ export function createRun(seed: number, operator = 'operator'): SimState {
 export function refreshStats(p: Player): void {
   const oldMax = p.stats.maxHp;
   p.stats = computeStats(p.mods);
+  p.fx = aggregate(p.modules);
   const maxHp = Math.max(1, Math.round(p.stats.maxHp));
   if (maxHp > oldMax) p.hp += maxHp - oldMax;
   p.hp = Math.min(p.hp, maxHp);
 }
 
 export const maxHpOf = (p: Player): number => Math.max(1, Math.round(p.stats.maxHp));
+
+/** Добавить модуль: копия + его модификаторы с источником. */
+export function addModule(p: Player, id: string): void {
+  const def = moduleById(id);
+  const slot = p.modules.find((m) => m.id === id);
+  if (slot) slot.count++;
+  else p.modules.push({ id, count: 1 });
+  for (const m of def.mods) p.mods.push({ stat: m.stat, ...(m.flat !== undefined ? { flat: m.flat } : {}), ...(m.pct !== undefined ? { pct: m.pct } : {}), source: { kind: 'module', id } });
+  refreshStats(p);
+}
+
+export const moduleCount = (p: Player, id: string): number => p.modules.find((m) => m.id === id)?.count ?? 0;

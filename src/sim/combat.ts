@@ -8,6 +8,7 @@ import type { WeaponDef } from '../content/weapons';
 import type { EventSink } from './events';
 import { armorMult, dodgeChance } from './stats';
 import { maxHpOf, type Enemy, type SimState, type WeaponInst } from './state';
+import { absorbHit, onHit, onHurt, onKill } from './effects';
 import { TIER_MULT } from '../content/balance';
 
 const comboMult = (combo: number): number => Math.min(5, 1 + Math.floor(combo / 6));
@@ -17,7 +18,9 @@ const MAX_SCRAP_ENTITIES = 700;
 export function rollWeaponDamage(s: SimState, def: WeaponDef, inst: WeaponInst): { dmg: number; crit: boolean } {
   const st = s.p.stats;
   const cls = def.dmgClass === 'melee' ? st.meleeDmg : def.dmgClass === 'ranged' ? st.rangedDmg : st.energyDmg;
-  const mult = Math.max(0.1, 1 + (st.damage + cls) / 100);
+  const p = s.p;
+  const low = p.fx.lowHpDmg.pct && p.hp < maxHpOf(p) * (p.fx.lowHpDmg.below / 100) ? p.fx.lowHpDmg.pct : 0;
+  const mult = Math.max(0.1, 1 + (st.damage + cls + low) / 100);
   const crit = chance(s.rng.combat, clamp(st.crit, 0, 100) / 100);
   return { dmg: def.damage * TIER_MULT[inst.tier - 1]! * mult * (crit ? CRIT_MULT : 1), crit };
 }
@@ -34,8 +37,11 @@ export function dropScrap(s: SimState, x: number, y: number, value: number): voi
   s.scraps.push({ x, y, px: x, py: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, v: value, pulled: false });
 }
 
-/** Нанести урон врагу. weapon — id оружия для статистики (или 'pulse-ability'). */
-export function damageEnemy(s: SimState, e: Enemy, raw: number, crit: boolean, weapon: string, ev: EventSink, showNumber = true): void {
+/**
+ * Нанести урон врагу. weapon — id источника для статистики.
+ * depth 0 — прямое попадание оружия (запускает on-hit/on-kill эффекты), 1 — урон от эффектов (не запускает).
+ */
+export function damageEnemy(s: SimState, e: Enemy, raw: number, crit: boolean, weapon: string, ev: EventSink, showNumber = true, depth = 0): void {
   if (e.dead) return;
   const dmg = e.shielded ? raw * 0.6 : raw;
   e.hp -= dmg;
@@ -50,10 +56,11 @@ export function damageEnemy(s: SimState, e: Enemy, raw: number, crit: boolean, w
     p.hp = Math.min(maxHpOf(p), p.hp + 1);
     p.lifestealCd = 0.1;
   }
-  if (e.hp <= 0) killEnemy(s, e, ev);
+  if (depth === 0 && e.hp > 0) onHit(s, e, dmg, crit, ev, damageEnemy);
+  if (e.hp <= 0) killEnemy(s, e, ev, depth);
 }
 
-export function killEnemy(s: SimState, e: Enemy, ev: EventSink): void {
+export function killEnemy(s: SimState, e: Enemy, ev: EventSink, depth = 0): void {
   if (e.dead) return;
   e.dead = true;
   const def = ENEMIES[e.type];
@@ -72,6 +79,9 @@ export function killEnemy(s: SimState, e: Enemy, ev: EventSink): void {
   } else ev.push({ t: 'shake', v: 1.2 });
   ev.push({ t: 'sfx', id: boss ? 'killBoss' : e.elite ? 'killElite' : 'kill' });
 
+  // Эффекты модулей при убийстве (только от прямых попаданий — без цепных реакций)
+  const extra = depth === 0 ? onKill(s, e, ev, damageEnemy) : 0;
+  if (extra) dropScrap(s, e.x, e.y, extra);
   // Скрап
   const value = e.elite ? ELITE.scrap : def.scrap;
   if (chance(s.rng.loot, def.scrapChance)) {
@@ -108,7 +118,7 @@ export function spawnEnemyNow(s: SimState, type: EnemyType, x: number, y: number
     id: s.nextId++, type, elite, x, y, px: x, py: y, hp, maxHp: hp,
     r: def.r * (elite ? ELITE.size : 1), speed: def.speed, contact: def.contact * dmgMult, shotDmg: def.shotDmg * dmgMult,
     shot: range(s.rng.spawn, 0.8, 2), hit: 0, a: 0, dead: false, phase: range(s.rng.spawn, 0, TAU),
-    ai: 0, aiT: 0, vx: 0, vy: 0, hasted: false, shielded: false,
+    ai: 0, aiT: 0, vx: 0, vy: 0, hasted: false, shielded: false, burn: 0, burnDps: 0, slow: 0, slowPct: 0,
   };
   s.enemies.push(e);
   return e;
@@ -118,6 +128,7 @@ export function spawnEnemyNow(s: SimState, type: EnemyType, x: number, y: number
 export function hurtPlayer(s: SimState, raw: number, source: EnemyType | 'mine', ev: EventSink): void {
   const p = s.p;
   if (p.inv > 0 || s.phase !== 'play' || s.god) return;
+  if (absorbHit(s, ev)) return;
   if (chance(s.rng.combat, dodgeChance(p.stats.dodge) / 100)) {
     p.inv = 0.2;
     ev.push({ t: 'floater', x: p.x, y: p.y - 30, key: 'float.dodge', n: 0, color: PALETTE.cyan });
@@ -136,6 +147,7 @@ export function hurtPlayer(s: SimState, raw: number, source: EnemyType | 'mine',
   ev.push({ t: 'hitstop', ms: 50 });
   ev.push({ t: 'burst', x: p.x, y: p.y, color: '#ff6b61', n: 16, force: 180 });
   ev.push({ t: 'sfx', id: 'hurt' });
+  onHurt(s, ev, damageEnemy);
   if (p.hp <= 0) {
     p.hp = 0;
     s.stats.killedBy = source;

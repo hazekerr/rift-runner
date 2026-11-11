@@ -61,7 +61,7 @@ export function updateEnemies(s: SimState, dt: number, ev: EventSink): void {
     const dy = p.y - e.y;
     const d = Math.hypot(dx, dy) || 1;
     const a = Math.atan2(dy, dx);
-    let speed = e.speed * (e.hasted ? 1.3 : 1) * (s.overtime && e.type === 'boss' ? 1.3 : 1);
+    let speed = e.speed * (e.hasted ? 1.3 : 1) * (s.overtime && e.type === 'boss' ? 1.3 : 1) * (e.slow > 0 ? 1 - e.slowPct / 100 : 1);
 
     // Раннер: погоня → замах (телеграф) → рывок → откат
     if (e.type === 'runner') {

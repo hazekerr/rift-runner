@@ -15,6 +15,7 @@ import type { TickInput } from './input';
 import { createRun, maxHpOf, type SimState } from './state';
 import { gainScrap, startWave, updateWave } from './waves';
 import { updateWeapons } from './weapons';
+import { onDash, tickEffects } from './effects';
 import { enemyHash, MAX_ENEMY_R, move } from './world';
 
 const candidates: number[] = [];
@@ -40,6 +41,7 @@ function dash(s: SimState, inp: TickInput, ev: EventSink): void {
   p.inv = Math.max(p.inv, 0.28);
   ev.push({ t: 'ring', x: p.x, y: p.y, color: PALETTE.cyan, max: 65, life: 0.3 });
   ev.push({ t: 'sfx', id: 'dash' });
+  onDash(s, ev);
 }
 
 function pulse(s: SimState, ev: EventSink): void {
@@ -222,6 +224,7 @@ export function step(s: SimState, inp: TickInput, dt: number, ev: EventSink): vo
   updateEnemies(s, dt, ev);
   if (s.phase !== 'play') return;
   updateWeapons(s, inp, dt, ev);
+  tickEffects(s, dt, ev, damageEnemy);
   updateBullets(s, dt, ev);
   updateMines(s, dt, ev);
 
