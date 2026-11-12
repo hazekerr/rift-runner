@@ -450,3 +450,12 @@ stickEl.addEventListener('pointercancel', stickEnd);
   buy: (i: number) => { if (sim) { buyOffer(sim, i, events); drainEvents(); } },
   leaveShop: () => { if (sim) { leaveShop(sim, events); drainEvents(); } },
 };
+
+// PWA: офлайн и установка на телефон. Только в продакшен-сборке и по http(s) (не из file://)
+if (import.meta.env.PROD && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      /* без SW игра работает, просто без офлайна */
+    });
+  });
+}
