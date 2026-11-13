@@ -77,7 +77,7 @@ export const ru = {
   'killed.mine': 'мина',
 
   'touch.dash': 'РЫВОК',
-  'touch.pulse': 'ВОЛНА',
+  'touch.pulse': 'ИМПУЛЬС',
 
   'toast.wave': 'ВОЛНА {n}',
   'toast.wave.sub': 'ДВИГАЙСЯ. ЦЕЛЬСЯ. ВЫЖИВАЙ.',
