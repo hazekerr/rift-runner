@@ -92,6 +92,7 @@ export function killEnemy(s: SimState, e: Enemy, ev: EventSink, depth = 0): void
     ev.push({ t: 'shake', v: boss ? 16 : 7 });
   } else ev.push({ t: 'shake', v: 1.2 });
   ev.push({ t: 'sfx', id: boss ? 'killBoss' : e.elite ? 'killElite' : 'kill' });
+  ev.push({ t: 'death', type: e.type, x: e.x, y: e.y, a: e.a, r: e.r });
 
   // Эффекты модулей при убийстве (только от прямых попаданий — без цепных реакций)
   const extra = depth === 0 ? onKill(s, e, ev, damageEnemy) : 0;

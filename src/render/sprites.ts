@@ -277,11 +277,14 @@ export const ENEMY_ART: Record<string, EnemyArt> = {
     g.shadowBlur = 0;
   },
   swarm(g, R, c, glow) {
-    line(g, alpha(c, 0.55), 1.2, -R * 0.2, -R * 0.3, -R * 0.9, -R * 1.25);
-    line(g, alpha(c, 0.55), 1.2, -R * 0.2, R * 0.3, -R * 0.9, R * 1.25);
-    pts(g, [[R + 2, 0], [-R * 0.8, -R * 0.75], [-R * 0.4, 0], [-R * 0.8, R * 0.75]]);
+    // 2.0: круглый «жук» с двумя полупрозрачными крыльями — не путать с треугольным бегуном
+    g.fillStyle = alpha(c, 0.22);
+    for (const sgn of [-1, 1]) { g.beginPath(); g.ellipse(-R * 0.25, sgn * R * 0.85, R * 0.75, R * 0.45, sgn * 0.5, 0, TAU); g.fill(); }
+    g.beginPath(); g.arc(0, 0, R * 0.78, 0, TAU);
     hull(g, c, glow, '#2a2614', 1.4);
-    core(g, R * 0.2, 0, R * 0.25, c, glow);
+    line(g, c, 1.2, R * 0.6, -R * 0.3, R * 1.15, -R * 0.55);
+    line(g, c, 1.2, R * 0.6, R * 0.3, R * 1.15, R * 0.55);
+    core(g, R * 0.1, 0, R * 0.3, c, glow);
   },
   boss(g, R, c, glow) {
     // бронеплиты

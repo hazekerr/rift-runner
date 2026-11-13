@@ -1,4 +1,5 @@
 import type { I18nKey } from '../i18n';
+import type { EnemyType } from '../content/enemies';
 
 /** Звуковые события. Конкретные патчи — в audio/bank.ts. */
 export type SfxId =
@@ -23,6 +24,8 @@ export type SimEvent =
   | { t: 'hitstop'; ms: number }
   | { t: 'sfx'; id: SfxId; v?: number }
   | { t: 'toast'; key: I18nKey; sub: I18nKey; params: Record<string, number | string>; duration: number }
-  | { t: 'phase' };
+  | { t: 'phase' }
+  /** Смерть врага — для анимации распада силуэта (визуально, сим не зависит). */
+  | { t: 'death'; type: EnemyType; x: number; y: number; a: number; r: number };
 
 export type EventSink = SimEvent[];

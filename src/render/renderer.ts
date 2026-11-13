@@ -10,7 +10,7 @@ import { ENEMY_ART, enemyHalf, paintEnemyMine, paintMine, paintPickup, paintPlay
 import { t } from '../i18n';
 import type { Enemy, SimState } from '../sim/state';
 import type { Camera } from './camera';
-import type { Fx } from './fx';
+import { CORPSE_LIFE, type Fx } from './fx';
 
 export interface ViewState {
   crosshair: boolean;
@@ -131,6 +131,7 @@ export class Renderer {
       this.drawSpawns(s);
       this.drawTelegraphs(s, now);
       this.drawTurrets(s);
+      this.drawCorpses(fx);
       this.drawEnemies(s, alpha);
       this.drawBullets(s, alpha, true);
       this.drawWeaponFx(fx);
@@ -506,15 +507,20 @@ export class Renderer {
       }
       const spr = this.enemySprite(e.type);
       const k = e.r / def.r;
-      const h = spr.half * k;
       if (!isBoss(e.type)) {
+        // анимация «шага»: лёгкое дыхание размера в движении (фаза своя у каждого), в замахе — сжатие
+        const windup = e.ai === 1;
+        const pulse = windup ? 0.92 + 0.04 * Math.sin(e.phase * 40) : 1 + 0.045 * Math.sin(e.phase * (6 + def.speed / 40));
+        const h = spr.half * k * pulse;
         // обычные враги: заранее повёрнутый спрайт (24 направления), без матрицы
         let bin = Math.round((e.a / TAU) * ROT_BINS) % ROT_BINS;
         if (bin < 0) bin += ROT_BINS;
         const key = `e:${e.type}`;
         ctx.drawImage(this.sprites.rotated(key, spr, bin, ROT_BINS).canvas, ex - h, ey - h, h * 2, h * 2);
-        if (e.hit > 0 && this.flashes) {
-          ctx.globalAlpha = Math.min(1, e.hit / 0.06) * 0.85;
+        // замах: тело мигает белым — враг вот-вот ударит (телеграф на самом враге)
+        const flashA = e.hit > 0 && this.flashes ? Math.min(1, e.hit / 0.06) * 0.85 : windup ? 0.25 + 0.25 * Math.sin(e.phase * 30) : 0;
+        if (flashA > 0) {
+          ctx.globalAlpha = flashA;
           const w = this.sprites.white(key, spr);
           ctx.drawImage(this.sprites.rotated(`${key}:white`, w, bin, ROT_BINS).canvas, ex - h, ey - h, h * 2, h * 2);
           ctx.globalAlpha = 1;
@@ -527,6 +533,7 @@ export class Renderer {
           ctx.stroke();
         }
       } else {
+        const h = spr.half * k;
         // боссы (их 1–2): поворот матрицей, плюс кольца фаз
         const cos = Math.cos(e.a);
         const sin = Math.sin(e.a);
@@ -575,6 +582,28 @@ export class Renderer {
         ctx.fillRect(ex - w / 2, ey - e.r - 11, (w * Math.max(0, e.hp)) / e.maxHp, 3);
       }
     }
+  }
+
+  /** Распад убитых: белый силуэт раздувается и тает за 0.22 с. */
+  private drawCorpses(fx: Fx): void {
+    const ctx = this.ctx;
+    const cs = fx.corpses;
+    for (let i = 0; i < cs.count; i++) {
+      const q = cs.items[i]!;
+      const type = q.type as keyof typeof ENEMIES;
+      const def = ENEMIES[type];
+      if (!def || isBoss(type)) continue;
+      const k = 1 - q.life / CORPSE_LIFE;
+      const spr = this.enemySprite(type);
+      let bin = Math.round((q.a / TAU) * ROT_BINS) % ROT_BINS;
+      if (bin < 0) bin += ROT_BINS;
+      const key = `e:${type}`;
+      const w = this.sprites.rotated(`${key}:white`, this.sprites.white(key, spr), bin, ROT_BINS);
+      const h = spr.half * (q.r / def.r) * (1 + 0.45 * k);
+      ctx.globalAlpha = 0.7 * (1 - k);
+      ctx.drawImage(w.canvas, q.x - h, q.y - h, h * 2, h * 2);
+    }
+    ctx.globalAlpha = 1;
   }
 
   /** Телеграфы врагов 2.0: запал камикадзе, точка прыжка, луч снайпера, точка появления фантома. */

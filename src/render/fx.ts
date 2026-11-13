@@ -7,9 +7,11 @@ interface Particle { x: number; y: number; vx: number; vy: number; life: number;
 interface Ring { x: number; y: number; color: string; r: number; max: number; life: number; total: number }
 interface Floater { x: number; y: number; text: string; color: string; life: number; big: boolean }
 interface Beam { pts: number[]; color: string; life: number; total: number; straight: boolean }
+interface Corpse { type: string; x: number; y: number; a: number; r: number; life: number }
 interface Swing { x: number; y: number; a: number; arc: number; r: number; color: string; life: number }
 
 const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
+export const CORPSE_LIFE = 0.22;
 
 /** Визуальные эффекты. Живут вне сима, используют Math.random (не влияют на детерминизм). */
 export class Fx {
@@ -18,6 +20,8 @@ export class Fx {
   floaters = new Pool<Floater>(256, () => ({ x: 0, y: 0, text: '', color: '', life: 0, big: false }));
   beams = new Pool<Beam>(64, () => ({ pts: [], color: '', life: 0, total: 1, straight: false }));
   swings = new Pool<Swing>(64, () => ({ x: 0, y: 0, a: 0, arc: 0, r: 0, color: '', life: 0 }));
+  /** Распад силуэта убитого врага (0.22 с); пул ограничен — в толпе старые просто не появляются. */
+  corpses = new Pool<Corpse>(96, () => ({ type: '', x: 0, y: 0, a: 0, r: 0, life: 0 }));
   /** Trauma ∈ [0,1] (Eiserloh): смещение = MAX_SHAKE · t² · shakeScale. */
   trauma = 0;
   /** Направленная отдача камеры (px), затухает. */
@@ -86,6 +90,12 @@ export class Fx {
         break;
       }
       case 'flash': this.flash = e.v; break;
+      case 'death': {
+        if (this.corpses.count >= 96) break;
+        const q = this.corpses.spawn();
+        q.type = e.type; q.x = e.x; q.y = e.y; q.a = e.a; q.r = e.r; q.life = CORPSE_LIFE;
+        break;
+      }
       default: break;
     }
   }
@@ -96,6 +106,12 @@ export class Fx {
     this.kickX *= kd;
     this.kickY *= kd;
     this.flash = Math.max(0, this.flash - dt * 2);
+    const cs = this.corpses;
+    for (let i = cs.count - 1; i >= 0; i--) {
+      const q = cs.items[i]!;
+      q.life -= dt;
+      if (q.life <= 0) cs.kill(i);
+    }
     const ps = this.particles;
     for (let i = ps.count - 1; i >= 0; i--) {
       const q = ps.items[i]!;
@@ -136,6 +152,7 @@ export class Fx {
     this.floaters.clear();
     this.beams.clear();
     this.swings.clear();
+    this.corpses.clear();
     this.trauma = 0;
     this.kickX = this.kickY = 0;
     this.flash = 0;
