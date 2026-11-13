@@ -47,6 +47,8 @@ export function effectText(s: SimState, e: EffectDef): string {
     case 'scrapOnKill': return t('fx.scrapOnKill', { chance: e.chance });
     case 'killHeal': return t('fx.killHeal', { chance: e.chance, amount: e.amount });
     case 'execute': return t('fx.execute', { below: e.below });
+    case 'dashPlus': return [e.charges ? t('fx.dashCharges', { n: e.charges }) : '', e.cdPct ? t('fx.dashCd', { n: e.cdPct }) : ''].filter(Boolean).join(' · ');
+    case 'pulseBoost': return [e.dmgPct ? t('fx.pulseDmg', { n: e.dmgPct, r: e.rPct }) : '', e.regenPct ? t('fx.energyRegen', { n: e.regenPct }) : ''].filter(Boolean).join(' · ');
   }
 }
 

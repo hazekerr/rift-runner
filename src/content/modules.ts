@@ -21,7 +21,10 @@ export type EffectDef =
   | { kind: 'dashReset'; chance: number; sec: number }
   | { kind: 'scrapOnKill'; chance: number }
   | { kind: 'killHeal'; chance: number; amount: number }
-  | { kind: 'execute'; below: number };
+  | { kind: 'execute'; below: number }
+  /** Способности: заряды и перезарядка рывка, сила/радиус импульса, восстановление энергии. */
+  | { kind: 'dashPlus'; charges: number; cdPct: number }
+  | { kind: 'pulseBoost'; dmgPct: number; rPct: number; regenPct: number };
 
 export type EffectKind = EffectDef['kind'];
 
@@ -63,6 +66,8 @@ export const MODULES: readonly ModuleDef[] = [
   m('medgel', 0, [{ stat: 'regen', flat: 3 }]),
   m('leech', 0, [{ stat: 'lifesteal', flat: 3 }]),
   m('amp', 0, [{ stat: 'damage', flat: 12 }]),
+  m('coolant', 0, [], { kind: 'dashPlus', charges: 0, cdPct: 20 }),
+  m('dynamo', 0, [], { kind: 'pulseBoost', dmgPct: 0, rPct: 0, regenPct: 60 }, ['energy']),
   // ---- УЛУЧШЕННЫЙ ----
   m('overclock', 1, [{ stat: 'atkSpeed', flat: 25 }, { stat: 'maxHp', flat: -5 }]),
   m('heavyplate', 1, [{ stat: 'armor', flat: 4 }, { stat: 'speed', flat: -4 }]),
@@ -78,6 +83,8 @@ export const MODULES: readonly ModuleDef[] = [
   m('igniter', 1, [], { kind: 'burn', chance: 10, dps: 6, dur: 3 }, ['element']),
   m('cryo', 1, [], { kind: 'slow', chance: 15, pct: 40, dur: 1.5 }, ['element']),
   m('siphon', 1, [], { kind: 'scrapHeal', every: 12 }),
+  m('thruster', 1, [{ stat: 'speed', flat: 3 }], { kind: 'dashPlus', charges: 1, cdPct: 0 }, [], 2),
+  m('overcharge', 1, [], { kind: 'pulseBoost', dmgPct: 80, rPct: 20, regenPct: 0 }, ['energy']),
   // ---- ПРОТОТИП ----
   m('rage', 2, [], { kind: 'lowHpDmg', pct: 35, below: 40 }),
   m('reactor', 2, [{ stat: 'damage', flat: 35 }, { stat: 'armor', flat: -2 }]),

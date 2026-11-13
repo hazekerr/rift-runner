@@ -189,6 +189,13 @@ export interface SimState {
   rng: { spawn: Rng; loot: Rng; combat: Rng; offer: Rng };
 }
 
+/** Заряды рывка с модулями. */
+export const dashCap = (p: Player): number => p.dashMaxCharges + p.fx.dashCharges;
+/** Перезарядка одного заряда рывка с модулями. */
+export const dashCooldown = (p: Player): number => p.dashMax * (1 - p.fx.dashCdPct / 100);
+/** Радиус импульса. */
+export const pulseRadius = (p: Player): number => 340 * (1 + p.fx.pulseRPct / 100);
+
 export function createPlayer(operator: string): Player {
   const op = operatorById(operator);
   const mods: Modifier[] = op.mods.map((m) => ({ ...m, source: { kind: 'operator' as const, id: op.id } }));

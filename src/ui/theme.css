@@ -150,3 +150,6 @@ button:focus-visible,[data-nav]:focus-visible,input:focus-visible{outline:2px so
 .pause-weapons{display:grid;gap:4px;margin:10px auto;text-align:left;max-width:520px;width:100%}
 .pw-head{display:flex;align-items:center;gap:8px;width:100%;background:#0c171c;border:1px solid #1d3038;padding:6px 8px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;text-align:left}
 .pw-head span{flex:1}.pw-head small{color:var(--muted);font-weight:400}.pw-head.open{border-color:currentColor}
+.brief{position:fixed;left:50%;bottom:110px;transform:translate(-50%,10px);display:flex;gap:12px;align-items:center;max-width:min(560px,calc(100vw - 32px));background:#0e171cee;border:1px solid #2d3f47;border-left:3px solid var(--orange);padding:10px 14px;pointer-events:none;z-index:3;opacity:0;transition:opacity .25s,transform .25s}
+.brief.on{opacity:1;transform:translate(-50%,0)}.brief img{width:40px;height:40px;flex:none}.brief img[src=""]{display:none}.brief b{display:block;font-size:11px;letter-spacing:2px;color:var(--orange);text-transform:uppercase}.brief span{display:block;font-size:13px;line-height:1.45;color:#d6e2e2;margin-top:3px}
+@media (max-width:700px){.brief{bottom:150px}.brief span{font-size:12px}}

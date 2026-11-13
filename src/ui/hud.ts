@@ -4,7 +4,7 @@ import { MAX_WEAPONS, weaponById } from '../content/weapons';
 import { RARITY_PIPS } from '../content/levelups';
 import { t } from '../i18n';
 import { isBoss } from '../content/enemies';
-import { maxHpOf, type SimState } from '../sim/state';
+import { dashCap, dashCooldown, maxHpOf, type SimState } from '../sim/state';
 import { $, DirtyStyle, DirtyText, h } from './dom';
 
 /** HUD. Пишет в DOM только изменившиеся значения. */
@@ -58,8 +58,9 @@ export class Hud {
     }
     this.scrap.set(String(s.scrap));
     this.bonus.set(s.bonusPool > 0 ? t('hud.bonus', { n: s.bonusPool }) : '');
-    this.dash.set(`${p.dashCharges >= p.dashMaxCharges ? 100 : (1 - p.dashCd / p.dashMax) * 100}%`);
-    this.charges.set(p.dashMaxCharges > 1 ? ` ${t('hud.dashCharges', { n: p.dashCharges })}` : '');
+    const cap = dashCap(p);
+    this.dash.set(`${p.dashCharges >= cap ? 100 : (1 - p.dashCd / dashCooldown(p)) * 100}%`);
+    this.charges.set(cap > 1 ? ` ${t('hud.dashCharges', { n: p.dashCharges })}` : '');
     this.pulse.set(`${p.energy}%`);
 
     const key = p.weapons.map((w) => `${w.id}:${w.tier}`).join(',');

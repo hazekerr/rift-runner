@@ -13,6 +13,8 @@ import { chooseLevel, leaveShop, rerollLevel } from './sim/waves';
 import { buyOffer, mergeWeapon, rerollShop, sellWeapon, toggleLock } from './sim/shop';
 import type { SimEvent } from './sim/events';
 import type { SimState } from './sim/state';
+import type { EnemyType } from './content/enemies';
+import { abilityIconUrl, enemyIconUrl, enemyMineIconUrl } from './ui/icons';
 import { loadMeta, recordRun, saveMeta, storage, type Settings } from './save/meta';
 import { clearRun, loadRun, saveRun } from './save/run';
 import { renderSettings } from './ui/settings';
@@ -259,6 +261,34 @@ function syncPhase(): void {
   hud.update(s, meta.best);
 }
 
+// ---------- брифинги: подсказка о новом враге/механике, один раз на профиль ----------
+const BRIEF_ENEMIES: readonly EnemyType[] = ['runner', 'gunner', 'tank', 'splitter', 'miner', 'healer', 'swarm'];
+let briefTime = 0;
+
+function showBrief(id: string, icon: string): void {
+  const el = $('brief');
+  (el.querySelector('img') as HTMLImageElement).src = icon;
+  (el.querySelector('b') as HTMLElement).textContent = t(`brief.${id}.t` as I18nKey);
+  (el.querySelector('span') as HTMLElement).textContent = t(`brief.${id}` as I18nKey);
+  el.classList.add('on');
+  briefTime = 6;
+  meta.seen.push(id);
+  saveMeta(kv, meta);
+}
+
+/** Первая встреча: враг в поле зрения → брифинг; на волне 2 — о рывке и импульсе. */
+function checkBriefs(s: SimState): void {
+  if (briefTime > 0 || s.dev) return;
+  if (s.wave >= 2 && !meta.seen.includes('abilities')) { showBrief('abilities', abilityIconUrl()); return; }
+  if (s.mines.length && !meta.seen.includes('mine')) { showBrief('mine', enemyMineIconUrl()); return; }
+  for (const e of s.enemies) {
+    if (!BRIEF_ENEMIES.includes(e.type) || meta.seen.includes(e.type)) continue;
+    if (Math.hypot(e.x - s.p.x, e.y - s.p.y) > 650) continue;
+    showBrief(e.type, enemyIconUrl(e.type));
+    return;
+  }
+}
+
 function notify(a: string, b: string, duration: number): void {
   const el = $('toast');
   (el.firstElementChild as HTMLElement).textContent = a;
@@ -316,6 +346,7 @@ startLoop({
     camera.tick(s.p.x, s.p.y, dt);
     drainEvents();
     if (app === 'play') hud.update(s, meta.best);
+    if (s.tick % 15 === 0) checkBriefs(s);
     simMs = simMs * 0.9 + (performance.now() - t0) * 0.1;
   },
   render(alpha, frameDt) {
@@ -327,6 +358,7 @@ startLoop({
       fx.update(frameDt);
       toastTime -= frameDt;
       if (toastTime <= 0) $('toast').style.opacity = '0';
+      if (briefTime > 0) { briefTime -= frameDt; if (briefTime <= 0) $('brief').classList.remove('on'); }
     }
     $('hurt').style.opacity = view.flashes ? String(fx.flash) : '0';
     ambient.setIntensity(audio, musicIntensity());

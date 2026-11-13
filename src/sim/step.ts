@@ -12,7 +12,7 @@ import { damageEnemy, hurtPlayer } from './combat';
 import { updateEnemies, updateMines } from './enemies';
 import type { EventSink } from './events';
 import type { TickInput } from './input';
-import { createRun, maxHpOf, type SimState } from './state';
+import { createRun, dashCap, dashCooldown, maxHpOf, pulseRadius, type SimState } from './state';
 import { gainScrap, startWave, updateWave } from './waves';
 import { updateWeapons } from './weapons';
 import { onDash, tickEffects } from './effects';
@@ -40,7 +40,7 @@ function dash(s: SimState, inp: TickInput, ev: EventSink): void {
   p.dy = y / len;
   p.dashTime = 0.17;
   p.dashCharges--;
-  if (p.dashCd <= 0) p.dashCd = p.dashMax;
+  if (p.dashCd <= 0) p.dashCd = dashCooldown(p);
   p.inv = Math.max(p.inv, 0.28);
   ev.push({ t: 'ring', x: p.x, y: p.y, color: PALETTE.cyan, max: 65, life: 0.3 });
   ev.push({ t: 'sfx', id: 'dash' });
@@ -51,21 +51,22 @@ function pulse(s: SimState, ev: EventSink): void {
   const p = s.p;
   if (p.energy < 100) return;
   p.energy = 0;
-  ev.push({ t: 'ring', x: p.x, y: p.y, color: '#75f5df', max: 340, life: 0.6 });
+  const R = pulseRadius(p);
+  ev.push({ t: 'ring', x: p.x, y: p.y, color: '#75f5df', max: R, life: 0.6 });
   ev.push({ t: 'burst', x: p.x, y: p.y, color: '#75f5df', n: 70, force: 650 });
   ev.push({ t: 'shake', v: 12 });
   ev.push({ t: 'sfx', id: 'pulse' });
-  const base = 60 * enemyHpMult(s.wave);
+  const base = 60 * enemyHpMult(s.wave) * (1 + p.fx.pulseDmgPct / 100);
   for (const e of s.enemies) {
     const d = dist(e, p);
-    if (d < 340 && !e.dead) {
-      damageEnemy(s, e, base * (1 - d / 550), false, 'ability.pulse', ev);
+    if (d < R && !e.dead) {
+      damageEnemy(s, e, base * (1 - d / (R * 1.6)), false, 'ability.pulse', ev);
       const a = Math.atan2(e.y - p.y, e.x - p.x);
       move(s, e, Math.cos(a) * 65, Math.sin(a) * 65);
     }
   }
-  s.bullets = s.bullets.filter((b) => b.friendly || dist(b, p) > 370);
-  s.mines = s.mines.filter((m) => dist(m, p) > 370);
+  s.bullets = s.bullets.filter((b) => b.friendly || dist(b, p) > R + 30);
+  s.mines = s.mines.filter((m) => dist(m, p) > R + 30);
   p.inv = Math.max(p.inv, 0.4);
 }
 
@@ -75,15 +76,16 @@ function updatePlayer(s: SimState, inp: TickInput, dt: number, ev: EventSink): v
   if (inp.pulse) pulse(s, ev);
   p.inv = Math.max(0, p.inv - dt);
   // Заряды рывка восстанавливаются по одному
-  if (p.dashCharges < p.dashMaxCharges) {
+  const cap = dashCap(p);
+  if (p.dashCharges < cap) {
     p.dashCd -= dt;
     if (p.dashCd <= 0) {
       p.dashCharges++;
-      p.dashCd = p.dashCharges < p.dashMaxCharges ? p.dashMax : 0;
+      p.dashCd = p.dashCharges < cap ? dashCooldown(p) : 0;
     }
   } else p.dashCd = 0;
   p.lifestealCd = Math.max(0, p.lifestealCd - dt);
-  p.energy = Math.min(100, p.energy + dt * 1.7);
+  p.energy = Math.min(100, p.energy + dt * 1.7 * (1 + p.fx.energyRegenPct / 100));
   s.comboTime -= dt;
   // Реген: R HP за 5 с
   if (p.stats.regen > 0 && p.hp < maxHpOf(p)) {

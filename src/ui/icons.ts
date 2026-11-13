@@ -3,7 +3,8 @@
  * Рисуются кодом один раз и кешируются как data-URL (вставляются через <img>).
  * Оружие — тот же силуэт, что на орбите (WEAPON_ART); модули и статы — неоновые пиктограммы.
  */
-import { WEAPON_ART, paintSawDisc } from '../render/sprites';
+import { ENEMY_ART, WEAPON_ART, paintEnemyMine, paintSawDisc } from '../render/sprites';
+import { ENEMIES, type EnemyType } from '../content/enemies';
 import { RARITY_COLOR } from '../content/levelups';
 import { moduleById } from '../content/modules';
 import type { EffectKind } from '../content/modules';
@@ -102,6 +103,8 @@ const PICTO: Record<string, (g: G, c: string) => void> = {
   zap(g, c) { g.beginPath(); g.rect(19, 28, 10, 10); neon(g, c); g.beginPath(); g.moveTo(24, 28); g.lineTo(24, 18); neon(g, c); g.beginPath(); g.moveTo(24, 16); g.lineTo(16, 10); g.lineTo(20, 9); g.lineTo(12, 4); neon(g, '#8fd8ff', 1.6); g.beginPath(); g.moveTo(24, 16); g.lineTo(32, 10); g.lineTo(28, 9); g.lineTo(36, 4); neon(g, '#8fd8ff', 1.6); },
   dashReset(g, c) { g.beginPath(); g.arc(24, 24, 12, 0.3, Math.PI * 1.7); neon(g, c); g.beginPath(); g.moveTo(34, 14); g.lineTo(37, 22); g.lineTo(29, 20); g.closePath(); fillNeon(g, c); g.beginPath(); g.moveTo(19, 19); g.lineTo(29, 24); g.lineTo(19, 29); neon(g, c, 2); },
   scrapOnKill(g, c) { PICTO.harvest!(g, c); g.beginPath(); g.rect(33, 8, 3, 10); g.rect(29.5, 11.5, 10, 3); fillNeon(g, c); },
+  dashPlus(g, c) { PICTO.speed!(g, c); g.beginPath(); g.rect(33, 6, 3, 11); g.rect(29, 10, 11, 3); fillNeon(g, c); },
+  pulseBoost(g, c) { g.beginPath(); g.arc(24, 24, 5, 0, TAU); fillNeon(g, c); for (const r of [11, 17]) { g.beginPath(); g.arc(24, 24, r, 0, TAU); neon(g, c, r === 11 ? 2 : 1.4); } },
   killHeal(g, c) { PICTO.maxHp!(g, c); g.beginPath(); g.arc(24, 24, 19, 0, TAU); neon(g, c, 1.2); },
   execute(g, c) { g.beginPath(); g.arc(24, 24, 13, 0, TAU); neon(g, c); g.beginPath(); g.moveTo(24, 6); g.lineTo(24, 42); g.moveTo(6, 24); g.lineTo(42, 24); neon(g, c, 1.5); g.beginPath(); g.moveTo(18, 18); g.lineTo(30, 30); g.moveTo(30, 18); g.lineTo(18, 30); neon(g, '#ff6d65', 2.4); },
 };
@@ -157,4 +160,23 @@ export function iconImg(url: string, size: number, cls = 'icon'): HTMLImageEleme
   img.alt = '';
   img.draggable = false;
   return img;
+}
+
+/** Иконка врага для брифинга: тот же рисунок, что и в игре. */
+export function enemyIconUrl(type: EnemyType): string {
+  const def = ENEMIES[type];
+  return render(`en:${type}`, (g) => {
+    g.translate(24, 24);
+    ENEMY_ART[type]?.(g, 13, def.color, true);
+  });
+}
+
+/** Иконка вражеской мины для брифинга. */
+export function enemyMineIconUrl(): string {
+  return render('en:mine', (g) => { g.translate(24, 24); g.scale(1.3, 1.3); paintEnemyMine(g, true); });
+}
+
+/** Иконка брифинга о способностях. */
+export function abilityIconUrl(): string {
+  return render('ability', (g) => PICTO.pulseBoost!(g, '#62ecd2'));
 }

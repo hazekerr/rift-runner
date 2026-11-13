@@ -5,7 +5,7 @@ import { PALETTE } from '../content/palette';
 import { weaponById } from '../content/weapons';
 import { isBoss } from '../content/enemies';
 import { bladePos } from '../sim/weapons';
-import { ENEMY_ART, enemyHalf, paintMine, paintPickup, paintPlayer, paintSawDisc, paintScrap, paintTurret, paintTurretGun, SpriteBank, WEAPON_ART, type Sprite } from './sprites';
+import { ENEMY_ART, enemyHalf, paintEnemyMine, paintMine, paintPickup, paintPlayer, paintSawDisc, paintScrap, paintTurret, paintTurretGun, SpriteBank, WEAPON_ART, type Sprite } from './sprites';
 import { t } from '../i18n';
 import type { Enemy, SimState } from '../sim/state';
 import type { Camera } from './camera';
@@ -393,23 +393,42 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
+  /** Вражеские мины: пунктирная зона взрыва, дуга взвода, мигающий огонёк; цвет опасности. */
   private drawMines(s: SimState, now: number): void {
     const ctx = this.ctx;
+    const C = '#ff5a4a';
+    const spr = this.sprites.get('enemyMine', 16, (g, glow) => paintEnemyMine(g, glow));
     for (const m of s.mines) {
       const armed = m.arm <= 0;
-      // зона поражения видна заранее (телеграф)
-      ctx.globalAlpha = armed ? 0.18 + 0.12 * Math.sin(now * 0.02) : 0.1;
-      ctx.fillStyle = '#9be26b';
+      ctx.globalAlpha = armed ? 0.1 + 0.06 * Math.sin(now * 0.02) : 0.05;
+      ctx.fillStyle = C;
       ctx.beginPath();
       ctx.arc(m.x, m.y, MINE.radius, 0, TAU);
       ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = '#9be26b';
-      ctx.lineWidth = 1;
+      ctx.globalAlpha = armed ? 0.75 : 0.4;
+      ctx.strokeStyle = C;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 7]);
+      ctx.lineDashOffset = -now * 0.02;
       ctx.stroke();
-      ctx.fillStyle = armed && Math.sin(now * 0.03) > 0 ? '#ffffff' : '#9be26b';
-      this.pathPoly(ctx, m.x, m.y, 7, 4, Math.PI / 4);
-      ctx.fill();
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
+      if (!armed) {
+        // дуга взвода: заполняется, пока мина не встанет на боевой взвод
+        ctx.globalAlpha = 0.9;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 18, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - m.arm / MINE.arm));
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.drawImage(spr.canvas, m.x - spr.half, m.y - spr.half, spr.half * 2, spr.half * 2);
+      if (armed && Math.sin(now * 0.025) > 0) {
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 2.6, 0, TAU);
+        ctx.fill();
+      }
     }
   }
 

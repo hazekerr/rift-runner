@@ -420,6 +420,23 @@ export function paintPickup(g: G, kind: 'heal' | 'energy', glow: boolean): void 
   else pts(g, [[1, -7], [-5, 1], [0, 1], [-1, 7], [5, -1], [0, -1]]), g.fill();
 }
 
+/** Вражеская мина: шипастая сфера цвета опасности (не путать с зелёными аптечками). */
+export function paintEnemyMine(g: G, glow: boolean): void {
+  const c = '#ff5a4a';
+  g.beginPath();
+  for (let i = 0; i < 16; i++) {
+    const a = (i * Math.PI * 2) / 16;
+    const r = i % 2 ? 7 : 12;
+    g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  g.closePath();
+  hull(g, c, glow, '#2a0f0c', 1.6);
+  g.beginPath();
+  g.arc(0, 0, 4.5, 0, Math.PI * 2);
+  g.fillStyle = '#1a0806';
+  g.fill();
+}
+
 export function paintMine(g: G, glow: boolean): void {
   const c = '#ffd166';
   poly(g, 8, 6);

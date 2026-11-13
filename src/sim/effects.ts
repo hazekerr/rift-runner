@@ -28,6 +28,12 @@ export interface FxAgg {
   scrapOnKill: number;
   killHeal: { chance: number; amount: number };
   execute: number;
+  /** Способности (капы в aggregate). */
+  dashCharges: number;
+  dashCdPct: number;
+  pulseDmgPct: number;
+  pulseRPct: number;
+  energyRegenPct: number;
   /** Флаги синергий. */
   pierceBonus: number;
   explodeRadiusMult: number;
@@ -40,6 +46,7 @@ export const emptyFx = (): FxAgg => ({
   burn: { chance: 0, dps: 0, dur: 0 }, slow: { chance: 0, pct: 0, dur: 0 }, scrapHealEvery: 0, energyOnKill: 0,
   lowHpDmg: { pct: 0, below: 0 }, critArc: { targets: 0, pct: 0 }, zaps: [], dashReset: { chance: 0, sec: 0 },
   scrapOnKill: 0, killHeal: { chance: 0, amount: 0 }, execute: 0,
+  dashCharges: 0, dashCdPct: 0, pulseDmgPct: 0, pulseRPct: 0, energyRegenPct: 0,
   pierceBonus: 0, explodeRadiusMult: 1, turretLifeMult: 1, burnMult: 1,
 });
 
@@ -69,6 +76,8 @@ export function aggregate(modules: ReadonlyArray<{ id: string; count: number }>,
         case 'scrapOnKill': a.scrapOnKill += e.chance; break;
         case 'killHeal': a.killHeal.chance += e.chance; a.killHeal.amount = Math.max(a.killHeal.amount, e.amount); break;
         case 'execute': a.execute = Math.max(a.execute, e.below); break;
+        case 'dashPlus': a.dashCharges += e.charges; a.dashCdPct += e.cdPct; break;
+        case 'pulseBoost': a.pulseDmgPct += e.dmgPct; a.pulseRPct += e.rPct; a.energyRegenPct += e.regenPct; break;
       }
     }
   }
@@ -78,6 +87,10 @@ export function aggregate(modules: ReadonlyArray<{ id: string; count: number }>,
   a.dashReset.chance = Math.min(100, a.dashReset.chance);
   a.killHeal.chance = Math.min(100, a.killHeal.chance);
   a.dashNova.count = Math.min(40, a.dashNova.count);
+  a.dashCharges = Math.min(3, a.dashCharges);
+  a.dashCdPct = Math.min(50, a.dashCdPct);
+  a.pulseRPct = Math.min(60, a.pulseRPct);
+  a.energyRegenPct = Math.min(200, a.energyRegenPct);
   return a;
 }
 

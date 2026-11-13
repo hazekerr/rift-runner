@@ -11,7 +11,7 @@ import { waveWeights } from '../content/waves';
 import { circleRect } from './collide';
 import { spawnEnemyNow, sweepScrap } from './combat';
 import type { EventSink } from './events';
-import { maxHpOf, refreshStats, type SimState } from './state';
+import { dashCap, maxHpOf, refreshStats, type SimState } from './state';
 import { openShop } from './shop';
 import { operatorById } from '../content/operators';
 import { threatMods } from '../content/threat';
@@ -39,7 +39,7 @@ export function startWave(s: SimState, ev: EventSink): void {
   p.y = p.py = ARENA_CENTER.y;
   p.inv = 1.0;
   p.dashCd = 0;
-  p.dashCharges = p.dashMaxCharges;
+  p.dashCharges = dashCap(p);
   s.traps.length = 0;
   s.turrets.length = 0;
   for (const w of p.weapons) w.cd = 0.3;

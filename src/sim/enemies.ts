@@ -169,8 +169,8 @@ export function updateMines(s: SimState, dt: number, ev: EventSink): void {
     const near = Math.hypot(m.x - p.x, m.y - p.y) < MINE.trigger + p.r;
     if (m.arm <= 0 && (near || m.life <= 0)) {
       if (Math.hypot(m.x - p.x, m.y - p.y) < MINE.radius + p.r && p.dashTime <= 0) hurtPlayer(s, m.damage, 'mine', ev);
-      ev.push({ t: 'ring', x: m.x, y: m.y, color: '#9be26b', max: MINE.radius, life: 0.35 });
-      ev.push({ t: 'burst', x: m.x, y: m.y, color: '#9be26b', n: 14, force: 220 });
+      ev.push({ t: 'ring', x: m.x, y: m.y, color: '#ff5a4a', max: MINE.radius, life: 0.35 });
+      ev.push({ t: 'burst', x: m.x, y: m.y, color: '#ff5a4a', n: 14, force: 220 });
       ev.push({ t: 'sfx', id: 'mineBoom' });
       s.mines.splice(i, 1);
     }

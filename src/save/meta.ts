@@ -39,6 +39,8 @@ export interface MetaV4 {
   maxThreat: number;
   lastThreat: number;
   settings: Settings;
+  /** Показанные подсказки-брифинги (враги, способности) — каждая один раз на профиль. */
+  seen: string[];
 }
 export type Meta = MetaV4;
 
@@ -55,7 +57,7 @@ const emptyLife = (): Lifetime => ({ runs: 0, kills: 0, bestWave: 0, bestScrap: 
 export const defaultSettings = (): Settings => ({ music: 0, sfx: 0.8, shake: 1, flashes: true, numbers: true, lang: 'ru', quality: 'high' });
 export const defaultMeta = (): Meta => ({
   v: 4, best: 0, muted: false, unlocked: ['operator'], lastOperator: 'operator', life: emptyLife(),
-  maxThreat: 0, lastThreat: 0, settings: defaultSettings(),
+  maxThreat: 0, lastThreat: 0, settings: defaultSettings(), seen: [],
 });
 const unit = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d);
 
@@ -79,6 +81,7 @@ export function migrate(raw: unknown): Meta {
     const l = r.life as Record<string, unknown>;
     m.life = { runs: num(l.runs), kills: num(l.kills), bestWave: num(l.bestWave), bestScrap: num(l.bestScrap), guardianKills: num(l.guardianKills), wins: num(l.wins) };
   }
+  if (Array.isArray(r.seen)) m.seen = [...new Set(r.seen.filter((x): x is string => typeof x === 'string'))].slice(0, 64);
   // v3: Угроза открывается победами — у старых сохранений выводим из числа побед
   m.maxThreat = Math.min(4, r.maxThreat !== undefined ? num(r.maxThreat) : m.life.wins > 0 ? 1 : 0);
   m.lastThreat = Math.min(m.maxThreat, num(r.lastThreat));
