@@ -21,7 +21,7 @@ const healKit = (s: SimState): number => s.stats.healBy?.kit ?? 0;
 const healOther = (s: SimState): number => Object.entries(s.stats.healBy ?? {}).reduce((a, [k, v]) => a + (k === 'kit' ? 0 : v ?? 0), 0);
 
 /** Реальный DPS оружия в бою: 4 копии тира II, бот своего стиля, 25 с волны, бессмертный оператор. */
-function weaponProbe(id: string, wave: number, seeds: readonly number[]): { dps: number; taken: number } {
+function weaponProbe(id: string, wave: number, seeds: readonly number[], hpMul = 1): { dps: number; taken: number } {
   let dmg = 0;
   let taken = 0;
   for (const seed of seeds) {
@@ -32,7 +32,13 @@ function weaponProbe(id: string, wave: number, seeds: readonly number[]): { dps:
     s.p.weapons = [0, 1, 2, 3].map((i) => ({ uid: 50 + i, id, tier: 2, cd: 0, aim: 0, flash: 0, x: s.p.x, y: s.p.y }));
     refreshStats(s.p);
     s.p.stats.maxHp = 1e6; s.p.hp = 1e6;
-    for (let t = 0; t < 60 * 25 && s.phase === 'play'; t++) { step(s, botInput(s), DT, ev); ev.length = 0; }
+    // hpMul > 1 — «толпа»: враги не успевают умирать, видно масштабирование по площади
+    let seen = 0;
+    for (let t = 0; t < 60 * 25 && s.phase === 'play'; t++) {
+      for (const e of s.enemies) if (e.id > seen) { e.hp *= hpMul; e.maxHp *= hpMul; seen = Math.max(seen, e.id); }
+      step(s, botInput(s), DT, ev);
+      ev.length = 0;
+    }
     dmg += s.stats.damageByWeapon[id] ?? 0;
     taken += s.stats.damageTaken;
   }
@@ -107,16 +113,18 @@ describe.skipIf(!process.env.BALANCE_REPORT)('баланс-прогон', () => 
       if (!rs.length) break;
       lines.push(`| ${w} | ${Math.round(median(rs.map((x) => x.reqDps)))} | ${Math.round(median(rs.map((x) => x.botDps)))} | ${Math.round(median(rs.map((x) => x.hpEnd)))} / ${Math.round(median(rs.map((x) => x.maxHp)))} | ${Math.round(median(rs.map((x) => x.taken)))} | ${Math.round(median(rs.map((x) => x.healKit)))} / ${Math.round(median(rs.map((x) => x.healOther)))} | ${Math.round(median(rs.map((x) => x.alive)))} | ${Math.round(median(rs.map((x) => x.kills)))} | ${Math.round(median(rs.map((x) => x.scrap)))} | ${median(rs.map((x) => x.level))} | ${rs.length} |`);
     }
-    lines.push('', '## Реальный DPS оружия', '', '4 копии тира II, бот своего стиля (ближнее оружие — подходит вплотную), 25 с волны, 3 сида. Коридор: ±25% от медианы по всем оружиям.', '', '| Оружие | Класс | Стиль бота | DPS w5 | DPS w12 | w12 / медиана |', '|---|---|---|---|---|---|');
+    lines.push('', '## Реальный DPS оружия', '', '4 копии тира II, бот своего стиля (ближнее оружие — подходит вплотную), волна 12, 25 с, 3 сида, бессмертный оператор. Два замера: обычные враги (сильное оружие упирается в поток спавна) и «толпа» — враги ×4 HP (видно масштабирование по площади). Оценка — среднее геометрическое долей от медианы, коридор 0.7–1.4.', '', '| Оружие | Класс | Стиль бота | DPS обычн. | DPS толпа | Получено урона (толпа) | Оценка |', '|---|---|---|---|---|---|---|');
     const probe = WEAPONS.map((d) => {
       const tmp = startRun(1, []);
       tmp.p.weapons = [{ uid: 1, id: d.id, tier: 2, cd: 0, aim: 0, flash: 0, x: 0, y: 0 }];
-      return { d, style: botMelee(tmp) ? 'ближний' : 'дальний', w5: weaponProbe(d.id, 5, [1, 2, 3]).dps, w12: weaponProbe(d.id, 12, [1, 2, 3]).dps };
+      const crowd = weaponProbe(d.id, 12, [1, 2, 3], 4);
+      return { d, style: botMelee(tmp) ? 'ближний' : 'дальний', norm: weaponProbe(d.id, 12, [1, 2, 3]).dps, crowd: crowd.dps, taken: crowd.taken };
     });
-    const med12 = median(probe.map((x) => x.w12));
+    const mN = median(probe.map((x) => x.norm));
+    const mC = median(probe.map((x) => x.crowd));
     for (const x of probe) {
-      const k = x.w12 / med12;
-      lines.push(`| ${x.d.id} | ${x.d.dmgClass} | ${x.style} | ${Math.round(x.w5)} | ${Math.round(x.w12)} | ${k.toFixed(2)}${k < 0.75 || k > 1.25 ? ' ⚠' : ''} |`);
+      const k = Math.sqrt((x.norm / mN) * (x.crowd / mC));
+      lines.push(`| ${x.d.id} | ${x.d.dmgClass} | ${x.style} | ${Math.round(x.norm)} | ${Math.round(x.crowd)} | ${Math.round(x.taken)} | ${k.toFixed(2)}${k < 0.7 || k > 1.4 ? ' ⚠' : ''} |`);
     }
     lines.push('', '## Пример сборки по волнам (сид 1)', '');
     for (const row of runs[0]!.rows) lines.push(`- w${row.wave}: ${row.weapons}`);
@@ -124,4 +132,13 @@ describe.skipIf(!process.env.BALANCE_REPORT)('баланс-прогон', () => 
     console.log(runs.map((r) => `seed ${r.seed}: wave ${r.reached} ${r.won ? 'WIN' : r.killedBy}`).join('\n'));
     expect(runs.length).toBe(6);
   }, 1_800_000);
+});
+
+describe.skipIf(!process.env.WEAPON_PROBE)('реальный DPS оружия (быстрый замер)', () => {
+  it('таблица', () => {
+    const rows = WEAPONS.map((d) => ({ id: d.id, n: weaponProbe(d.id, 12, [1, 2, 3]).dps, c: weaponProbe(d.id, 12, [1, 2, 3], 4) }));
+    const mN = median(rows.map((x) => x.n));
+    const mC = median(rows.map((x) => x.c.dps));
+    console.log(rows.map((x) => `${x.id.padEnd(8)} norm=${Math.round(x.n)} crowd=${Math.round(x.c.dps)} taken=${Math.round(x.c.taken)} k=${Math.sqrt((x.n / mN) * (x.c.dps / mC)).toFixed(2)}`).join('\n'));
+  }, 600_000);
 });

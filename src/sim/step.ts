@@ -4,7 +4,7 @@
  */
 import { dist } from '../core/math';
 import { WORLD, CRATE_SIZE } from '../content/arena';
-import { enemyHpMult } from '../content/balance';
+import { KIT, enemyHpMult } from '../content/balance';
 import { PALETTE } from '../content/palette';
 import { BASE_MAGNET, BASE_SPEED } from '../content/stats';
 import { segDistance, segRect } from './collide';
@@ -277,7 +277,7 @@ function updateLoot(s: SimState, dt: number, ev: EventSink): void {
     }
     if (d < 27) {
       if (item.type === 'heal') {
-        const heal = Math.round(maxHpOf(p) * 0.2);
+        const heal = Math.round(maxHpOf(p) * KIT.heal);
         healPlayer(s, heal, 'kit');
         ev.push({ t: 'floater', x: p.x, y: p.y - 28, key: 'float.heal', n: heal, color: PALETTE.cyan });
       } else {

@@ -11,7 +11,7 @@ import type { EventSink } from './events';
 import { armorMult, dodgeChance } from './stats';
 import { healPlayer, maxHpOf, type Enemy, type SimState, type WeaponInst } from './state';
 import { absorbHit, onHit, onHurt, onKill } from './effects';
-import { TIER_MULT } from '../content/balance';
+import { KIT, TIER_MULT, kitCap } from '../content/balance';
 
 const comboMult = (combo: number): number => Math.min(5, 1 + Math.floor(combo / 6));
 const MAX_SCRAP_ENTITIES = 700;
@@ -96,9 +96,11 @@ export function killEnemy(s: SimState, e: Enemy, ev: EventSink, depth = 0): void
   }
   // Расходники (удача повышает шанс)
   const luckM = 1 + Math.max(0, s.p.stats.luck) / 100;
-  if (boss || e.elite) s.pickups.push({ x: e.x, y: e.y, px: e.x, py: e.y, type: 'heal', life: 18 });
-  else if (chance(s.rng.loot, 0.02 * luckM)) s.pickups.push({ x: e.x, y: e.y, px: e.x, py: e.y, type: 'heal', life: 15 });
-  else if (chance(s.rng.loot, 0.03 * luckM)) s.pickups.push({ x: e.x, y: e.y, px: e.x, py: e.y, type: 'energy', life: 15 });
+  const kitRoll = boss || (e.elite ? chance(s.rng.loot, KIT.eliteChance) : chance(s.rng.loot, KIT.chance * luckM));
+  if (kitRoll && (boss || (s.kitsThisWave ?? 0) < kitCap(s.wave))) {
+    s.kitsThisWave = (s.kitsThisWave ?? 0) + 1;
+    s.pickups.push({ x: e.x, y: e.y, px: e.x, py: e.y, type: 'heal', life: boss ? 18 : 15 });
+  } else if (chance(s.rng.loot, 0.03 * luckM)) s.pickups.push({ x: e.x, y: e.y, px: e.x, py: e.y, type: 'energy', life: 15 });
 
   // Сплиттер раскалывается
   if (e.type === 'splitter') {

@@ -61,3 +61,9 @@ export const BONUS_POOL_SHARE = 0.5;
 export const HARVEST_GROWTH = 1.03;
 export const PLAYER_IFRAMES = 0.5;
 
+/**
+ * Аптечки (план 2.0, этап 3): в 1.1 бот отлечивал ~100% полученного урона за волну.
+ * Шанс с обычного врага × удача, элита — шанс, босс — всегда. Кап за волну не зависит от удачи.
+ */
+export const KIT = { chance: 0.005, eliteChance: 0.35, heal: 0.12 } as const;
+export const kitCap = (w: number): number => (w >= 11 ? 2 : 3);

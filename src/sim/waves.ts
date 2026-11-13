@@ -27,6 +27,7 @@ export function startWave(s: SimState, ev: EventSink): void {
   s.waveLeft = s.waveDuration;
   s.spawnAcc = 0;
   s.burstsDone = 0;
+  s.kitsThisWave = 0;
   s.overtime = false;
   s.levelRerolls = 0;
   s.waveDmgMult = enemyDmgMult(s.wave);

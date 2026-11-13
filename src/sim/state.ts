@@ -172,6 +172,8 @@ export interface SimState {
   xp: number;
   level: number;
   pendingLevels: number;
+  /** Аптечек выпало с врагов в этой волне (кап kitCap). */
+  kitsThisWave?: number;
   levelOffer: LevelOffer[];
   levelRerolls: number;
   shop: ShopState;
