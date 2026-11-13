@@ -143,3 +143,10 @@ button:focus-visible,[data-nav]:focus-visible,input:focus-visible{outline:2px so
 @media(max-width:740px){.hud-wicon{display:none}}
 @media(pointer:coarse) and (max-height:500px){.hud-wicon{display:none}}
 .line.dps-gain{color:#ffc163;font-size:12px}.card .dps-gain{margin:2px 0 4px}
+.arm-name[role=button]{cursor:pointer}.arm.open .arm-name{text-decoration:underline dotted}
+.arm-detail{padding:6px 8px 8px;margin:0 0 6px;background:#0c171c;border:1px solid #1d3038;border-top:0}
+.wfacts{display:grid;gap:3px;font-size:11px}.wfact{display:flex;justify-content:space-between;gap:10px}.wfact span{color:var(--muted)}.wfact b{color:#eef3ed;font-weight:600;text-align:right}
+.wdesc{margin:0 0 4px;font-size:11px;color:#a9bbbd;line-height:1.35}.line.sub{color:var(--muted);font-size:11px}
+.pause-weapons{display:grid;gap:4px;margin:10px auto;text-align:left;max-width:520px;width:100%}
+.pw-head{display:flex;align-items:center;gap:8px;width:100%;background:#0c171c;border:1px solid #1d3038;padding:6px 8px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;text-align:left}
+.pw-head span{flex:1}.pw-head small{color:var(--muted);font-weight:400}.pw-head.open{border-color:currentColor}

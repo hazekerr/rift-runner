@@ -10,11 +10,12 @@ import { computeStats } from '../sim/stats';
 import { effectScale } from '../sim/effects';
 import { canTakeWeapon, currentReroll, mergePartner, sellValue } from '../sim/shop';
 import { moduleCount, type ShopOffer, type SimState } from '../sim/state';
-import { weaponRange } from '../sim/weapons';
+import { weaponCooldown, weaponRange } from '../sim/weapons';
 import { $, h } from './dom';
 import { TAG_ORDER } from '../content/synergies';
 import { renderStats } from './statspanel';
 import { dpsGain, weaponDps } from '../sim/dps';
+import { hitDamage, weaponFactsEl } from './weaponinfo';
 
 export interface ShopActions {
   buy(i: number): void;
@@ -160,6 +161,7 @@ export class ShopView {
       body.push(h('div', 'ohead', iconImg(weaponIconUrl(o.id, o.tier), 48, 'offer-icon'), h('div', '', h('b', 'oname', t(def.name)), h('div', 'otype', t('shop.weapon', { n: RARITY_PIPS[o.tier - 1]! })))));
       body.push(h('p', 'odesc', t(def.desc)));
       body.push(h('div', 'line', t('shop.dps', { n: Math.round(weaponDps(s, o.id, o.tier)), r: Math.round(weaponRange(s, def)) })));
+      body.push(h('div', 'line sub', t('shop.hitcd', { d: Math.round(hitDamage(s, def, o.tier) * 10) / 10, p: def.pellets ?? 1, c: Math.round(weaponCooldown(s, def, { uid: 0, id: o.id, tier: o.tier, cd: 0, aim: 0, flash: 0, x: 0, y: 0 }) * 100) / 100 })));
       body.push(tagRow(def.tags));
       if (s.p.weapons.some((w) => w.id === o.id && w.tier === o.tier) && o.tier < 4) {
         body.push(h('div', 'badge', t('shop.merge', { n: RARITY_PIPS[o.tier]! })));
@@ -190,6 +192,8 @@ export class ShopView {
     return card;
   }
 
+  private openWeapon: number | null = null;
+
   private renderArsenal(s: SimState): void {
     $('arsenallabel').textContent = t('shop.arsenal', { n: s.p.weapons.length, m: MAX_WEAPONS });
     const root = $('arsenal');
@@ -200,7 +204,13 @@ export class ShopView {
       const def = weaponById(w.id);
       const name = h('span', 'arm-name', iconImg(weaponIconUrl(w.id, w.tier), 22, 'arm-icon'), `${t(def.name)} `, h('em', '', RARITY_PIPS[w.tier - 1]!));
       name.style.color = def.color;
-      const row = h('div', 'arm', name, h('span', 'arm-dps', `${Math.round(weaponDps(s, w.id, w.tier))} DPS`));
+      const open = this.openWeapon === w.uid;
+      const row = h('div', `arm${open ? ' open' : ''}`, name, h('span', 'arm-dps', `${Math.round(weaponDps(s, w.id, w.tier))} DPS`));
+      // нажатие на название — подробная карточка оружия (урон, перезарядка, дальность, особенности)
+      name.setAttribute('role', 'button');
+      name.tabIndex = 0;
+      name.title = t('shop.detailHint');
+      name.addEventListener('click', () => { this.openWeapon = open ? null : w.uid; this.renderArsenal(s); });
       if (mergePartner(s.p.weapons, w)) {
         const mb = h('button', 'mini merge', t('shop.mergeBtn'));
         mb.addEventListener('click', () => this.actions.merge(w.uid));
@@ -211,6 +221,10 @@ export class ShopView {
       sb.addEventListener('click', () => this.actions.sell(w.uid));
       row.append(sb);
       root.append(row);
+      if (open) {
+        const box = h('div', 'arm-detail', weaponFactsEl(s, w.id, w.tier));
+        root.append(box);
+      }
     }
   }
 

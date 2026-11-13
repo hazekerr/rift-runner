@@ -26,6 +26,7 @@ import { Hud } from './ui/hud';
 import { renderEnd, renderEndExtra, renderLevelUp } from './ui/screens';
 import { ShopView } from './ui/shop';
 import { renderStats } from './ui/statspanel';
+import { renderPauseWeapons } from './ui/weaponinfo';
 import type { StatId } from './content/stats';
 import { DevPanel } from './ui/devpanel';
 
@@ -204,7 +205,7 @@ function pause(): void {
     input.reset();
     $('knob').style.transform = '';
     show('pausemenu', true);
-    if (sim) renderStats($('pausestats'), sim.p, pauseOpen, null);
+    if (sim) { renderPauseWeapons($('pauseweapons'), sim); renderStats($('pausestats'), sim.p, pauseOpen, null); }
     $('toast').style.opacity = '0';
   } else if (app === 'paused') {
     app = 'play';
