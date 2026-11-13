@@ -32,6 +32,7 @@ export function renderLevelUp(s: SimState, onPick: (i: number) => void, onReroll
     cards.append(card);
   });
   const cost = rerollCost(s.wave, s.levelRerolls);
+  $('lvlscrap').textContent = fmtNum(s.scrap);
   const rr = $<HTMLButtonElement>('reroll');
   rr.textContent = t('lvl.reroll', { n: cost });
   rr.disabled = s.scrap < cost;

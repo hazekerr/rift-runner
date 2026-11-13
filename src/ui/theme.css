@@ -37,6 +37,7 @@
 .term-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px dashed #2b3940;padding-bottom:12px}
 .term-head h2{font:800 26px/1.1 Segoe UI,Arial,sans-serif;letter-spacing:-1px;margin:8px 0 0}
 .term-scrap{display:flex;align-items:baseline;gap:8px}.term-scrap b{font-size:28px;color:#ffc163}.term-scrap small{font-size:10px;letter-spacing:2px;color:var(--muted)}
+.lvl-actions{align-items:center;gap:18px}.lvl-scrap b{font-size:22px}
 .term-body{display:grid;grid-template-columns:1fr 300px;gap:22px;margin-top:14px;min-height:0}
 .term-label{font-size:10px;letter-spacing:2px;color:var(--cyan);margin:14px 0 8px}.term-label:first-child{margin-top:0}
 .offer-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
