@@ -42,7 +42,7 @@ describe('meta v2: миграция и открытия', () => {
   it('recordRun копит статистику и открывает операторов по условиям', () => {
     const m = loadMeta(null);
     expect(recordRun(m, { wave: 5, kills: 300, scrap: 200, guardianKills: 0, won: false, score: 100, threat: 0 })).toEqual(['welder']);
-    expect(recordRun(m, { wave: 11, kills: 800, scrap: 900, guardianKills: 1, won: false, score: 50, threat: 0 }).sort()).toEqual(['ghost', 'marauder', 'signal']);
+    expect(recordRun(m, { wave: 11, kills: 800, scrap: 900, guardianKills: 1, won: false, score: 50, threat: 0 }).sort()).toEqual(['butcher', 'ghost', 'marauder', 'signal']);
     expect(m.life).toMatchObject({ runs: 2, kills: 1100, bestWave: 11, bestScrap: 900, guardianKills: 1 });
     expect(m.best).toBe(100);
   });

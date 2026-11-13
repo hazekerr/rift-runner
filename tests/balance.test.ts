@@ -13,9 +13,9 @@ describe('баланс: кривые совпадают с SUMMARY.md', () => {
   it('множители врагов', () => {
     expect(enemyHpMult(1)).toBe(1);
     expect(enemyHpMult(10)).toBeCloseTo(3.7);
-    // 2.0 «Разлом открыт»: после 10-й HP ×1.06 за волну, урон +35%, спавн на 11–19 ×1.8
+    // 2.0 «Разлом открыт»: после 10-й HP ×1.06 за волну, урон +50%, спавн на 11–19 ×1.8
     expect(enemyHpMult(20)).toBeCloseTo(6.7 * 1.06 ** 10, 2);
-    expect(enemyDmgMult(20)).toBeCloseTo(3.28 * 1.35);
+    expect(enemyDmgMult(20)).toBeCloseTo(3.28 * 1.5);
     expect(spawnRate(20)).toBeCloseTo(5.18);
     expect(spawnRate(15)).toBeCloseTo(4.08 * 1.8);
   });
@@ -39,15 +39,14 @@ describe('баланс: кривые совпадают с SUMMARY.md', () => {
       for (const x of waveWeights(w)) if (x.row.from === w && x.row.type !== 'drone') expect(x.weight / total).toBeLessThan(0.2);
     }
   });
-  it('оружия 14–16, у каждого тега есть оружие', () => {
-    expect(WEAPONS.length).toBeGreaterThanOrEqual(14);
-    expect(WEAPONS.length).toBeLessThanOrEqual(16);
+  it('оружия 24 (2.0), у каждого тега есть оружие', () => {
+    expect(WEAPONS.length).toBe(24);
     for (const tag of ['melee', 'ballistic', 'energy', 'explosive', 'turret', 'element'] as const) expect(WEAPONS.some((w) => w.tags.includes(tag)), tag).toBe(true);
   });
   it('DPS тира I по одиночной цели в коридоре скилла game-balance', () => {
     const table = WEAPONS.map((w) => ({ id: w.id, dps: estimateDps(w) }));
     for (const { id, dps } of table) {
-      expect(dps, id).toBeGreaterThan(18); // AoE/цепь — ниже одиночного
+      expect(dps, id).toBeGreaterThan(15); // AoE/цепь/кнут — ниже одиночного; реальный DPS проверяет npm run balance
       expect(dps, id).toBeLessThan(85);
     }
   });

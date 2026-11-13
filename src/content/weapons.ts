@@ -49,6 +49,21 @@ export interface WeaponDef {
   blades?: number;
   /** Отбрасывание при попадании, px (ближний бой; боссы не отбрасываются). */
   knock?: number;
+  // ---- 2.0 ----
+  /** Оглушение при ударе, с (замедление 100%). */
+  stun?: number;
+  /** Шанс +1 HP за удар, % (встроенный вампиризм, без ICD статы). */
+  leech?: number;
+  /** Множитель крита вместо общего ×2. */
+  critMult?: number;
+  /** Раскрутка: чем дольше стреляет без перерыва, тем быстрее (до ×3). */
+  spin?: boolean;
+  /** Снаряд-бумеранг: на полпути разворачивается к оператору и режет повторно. */
+  boomerang?: boolean;
+  /** Стягивание врагов к центру взрыва, px. */
+  pull?: number;
+  /** Диски на орбите сбивают вражеские пули. */
+  blockBullets?: boolean;
   /** Отдача камеры (trauma). */
   kick: number;
   /** Силуэт на орбите: длина ствола и ширина. */
@@ -57,13 +72,13 @@ export interface WeaponDef {
 
 /** Оружие этапа 2. DPS тира I по одиночной цели — в комментарии (скилл game-balance: 55–80, AoE −20–35%). */
 export const WEAPONS: readonly WeaponDef[] = [
-  // 7 / 0.16 = 44 DPS (в бою был лидером: 1.65 медианы)
+  // 8.8 / 0.16 = 55 DPS (1.1: 9 и лидер 1.65 медианы; одиночное оружие страдает от щитоносцев и броненосцев)
   { id: 'pulse', name: 'w.pulse.name', desc: 'w.pulse.desc', tags: ['energy'], dmgClass: 'energy', kind: 'bullet',
-    damage: 7, cooldown: 0.16, range: 420, speed: 1100, pellets: 1, spread: 0.05, pierce: 1, bulletR: 3,
+    damage: 8.8, cooldown: 0.16, range: 420, speed: 1100, pellets: 1, spread: 0.05, pierce: 1, bulletR: 3,
     color: '#75f5df', sfx: 'shoot.pulse', kick: 0.02, look: { len: 16, w: 5 } },
   // 6×6 / 0.9 = 40 вплотную, конус
   { id: 'scatter', name: 'w.scatter.name', desc: 'w.scatter.desc', tags: ['ballistic'], dmgClass: 'ranged', kind: 'bullet',
-    damage: 7, cooldown: 0.9, range: 260, speed: 900, pellets: 6, spread: 0.36, pierce: 1, bulletR: 3,
+    damage: 10, cooldown: 0.9, range: 260, speed: 900, pellets: 6, spread: 0.36, pierce: 1, bulletR: 3,
     color: '#ffb86a', sfx: 'shoot.scatter', kick: 0.12, look: { len: 13, w: 8 } },
   // 36 / 1.1 = 33, пробивает 3 (было 48 и 5: 1.92 медианы)
   { id: 'rail', name: 'w.rail.name', desc: 'w.rail.desc', tags: ['energy'], dmgClass: 'energy', kind: 'bullet',
@@ -71,15 +86,15 @@ export const WEAPONS: readonly WeaponDef[] = [
     color: '#b4a0ff', sfx: 'shoot.rail', kick: 0.15, look: { len: 22, w: 4 } },
   // 21 / 0.5 = 42 по каждой цели в конусе; дальность 115 (было 85 — приходилось стоять в толпе), отбрасывание
   { id: 'blade', name: 'w.blade.name', desc: 'w.blade.desc', tags: ['melee'], dmgClass: 'melee', kind: 'swing',
-    damage: 21, cooldown: 0.5, range: 110, arc: 1.05, knock: 22,
+    damage: 14.5, cooldown: 0.5, range: 110, arc: 1.05, knock: 12,
     color: '#eef3ed', sfx: 'swing', kick: 0.05, look: { len: 20, w: 3 } },
-  // 4 / 0.085 = 47, разброс
+  // 5 / 0.085 = 59, разброс
   { id: 'nailer', name: 'w.nailer.name', desc: 'w.nailer.desc', tags: ['ballistic'], dmgClass: 'ranged', kind: 'bullet',
-    damage: 4, cooldown: 0.085, range: 380, speed: 1300, pellets: 1, spread: 0.12, pierce: 1, bulletR: 2,
+    damage: 5, cooldown: 0.085, range: 380, speed: 1300, pellets: 1, spread: 0.12, pierce: 1, bulletR: 2,
     color: '#d8dee0', sfx: 'shoot.nailer', kick: 0.01, look: { len: 14, w: 6 } },
   // 14 / 0.7 = 20 × до 3 целей
   { id: 'arc', name: 'w.arc.name', desc: 'w.arc.desc', tags: ['energy', 'element'], dmgClass: 'energy', kind: 'chain',
-    damage: 14, cooldown: 0.7, range: 300, chains: 3, chainRange: 140,
+    damage: 16.5, cooldown: 0.7, range: 300, chains: 3, chainRange: 140,
     color: '#8fd8ff', sfx: 'shoot.arc', kick: 0.04, look: { len: 12, w: 7 } },
   // 24 + взрыв 24 R65 / 1.3 = 37 по цели + площадь
   { id: 'rocket', name: 'w.rocket.name', desc: 'w.rocket.desc', tags: ['explosive'], dmgClass: 'ranged', kind: 'bullet',
@@ -91,7 +106,7 @@ export const WEAPONS: readonly WeaponDef[] = [
     color: '#ffb347', sfx: 'shoot.flamer', kick: 0.005, look: { len: 15, w: 9 } },
   // 11 / 0.35 = 31, замедляет
   { id: 'cryo', name: 'w.cryo.name', desc: 'w.cryo.desc', tags: ['element', 'energy'], dmgClass: 'energy', kind: 'bullet',
-    damage: 14, cooldown: 0.35, range: 400, speed: 900, pellets: 1, spread: 0.02, pierce: 1, bulletR: 4, slowPct: 35,
+    damage: 21, cooldown: 0.35, range: 400, speed: 900, pellets: 1, spread: 0.02, pierce: 1, bulletR: 4, slowPct: 35,
     color: '#9fe8ff', sfx: 'shoot.cryo', kick: 0.02, look: { len: 17, w: 6 } },
   // 30 R70 / 1.4 = 21 по площади
   { id: 'mine', name: 'w.mine.name', desc: 'w.mine.desc', tags: ['explosive'], dmgClass: 'ranged', kind: 'trap',
@@ -103,16 +118,57 @@ export const WEAPONS: readonly WeaponDef[] = [
     color: '#ff7547', sfx: 'shoot.mortar', kick: 0.08, look: { len: 12, w: 10 } },
   // турель: 7 урона каждые 0.3 с, живёт 7 с, до 2 одновременно (≈ 23–47 DPS)
   { id: 'turret', name: 'w.turret.name', desc: 'w.turret.desc', tags: ['turret', 'ballistic'], dmgClass: 'ranged', kind: 'turret',
-    damage: 11, cooldown: 6, range: 360, turretLife: 7, turretRate: 0.3, turretMax: 2,
+    damage: 17, cooldown: 6, range: 360, turretLife: 7, turretRate: 0.3, turretMax: 2,
     color: '#62ecd2', sfx: 'shoot.nailer', kick: 0, look: { len: 10, w: 10 } },
   // 3 диска по 12 урона, ICD 0.25; орбита 80 (было 62 и 2 диска — 0.84 медианы и всё вплотную)
   { id: 'saw', name: 'w.saw.name', desc: 'w.saw.desc', tags: ['melee', 'turret'], dmgClass: 'melee', kind: 'orbit',
-    damage: 12, cooldown: 0.25, range: 80, orbitR: 80, blades: 3,
+    damage: 8.5, cooldown: 0.25, range: 80, orbitR: 80, blades: 3,
     color: '#d8dee0', sfx: 'swing', kick: 0, look: { len: 8, w: 8 } },
   // 24 / 0.9 = 27, пробивает всех на линии
   { id: 'laser', name: 'w.laser.name', desc: 'w.laser.desc', tags: ['energy'], dmgClass: 'energy', kind: 'beam',
     damage: 24, cooldown: 0.9, range: 520,
     color: '#ff5fd2', sfx: 'shoot.laser', kick: 0.06, look: { len: 20, w: 5 } },
+  // ---------------- 2.0: 10 новых ----------------
+  // 40 / 1.2 = 33 по ВСЕМ вокруг (круг 360°), оглушение 0.3 с, отбрасывание
+  { id: 'hammer', name: 'w.hammer.name', desc: 'w.hammer.desc', tags: ['melee'], dmgClass: 'melee', kind: 'swing',
+    damage: 27, cooldown: 1.2, range: 95, arc: Math.PI, knock: 16, stun: 0.3,
+    color: '#ffb05e', sfx: 'swing', kick: 0.1, look: { len: 18, w: 8 } },
+  // 30 / 0.75 = 40 по линии 170 px сквозь всех
+  { id: 'spear', name: 'w.spear.name', desc: 'w.spear.desc', tags: ['melee'], dmgClass: 'melee', kind: 'beam',
+    damage: 20, cooldown: 0.75, range: 170, knock: 6,
+    color: '#d8f0ff', sfx: 'swing', kick: 0.04, look: { len: 24, w: 3 } },
+  // 8 / 0.16 = 50, узкий конус, 8% шанс +1 HP за удар
+  { id: 'claws', name: 'w.claws.name', desc: 'w.claws.desc', tags: ['melee'], dmgClass: 'melee', kind: 'swing',
+    damage: 5.5, cooldown: 0.16, range: 85, arc: 0.6, leech: 8,
+    color: '#ff6d8a', sfx: 'swing', kick: 0.01, look: { len: 12, w: 6 } },
+  // 17 / 0.7 = 24 по каждой цели в широкой дуге 160 px, сильное отбрасывание
+  { id: 'whip', name: 'w.whip.name', desc: 'w.whip.desc', tags: ['melee', 'element'], dmgClass: 'melee', kind: 'swing',
+    damage: 12, cooldown: 0.7, range: 160, arc: 1.3, knock: 18,
+    color: '#ffd166', sfx: 'swing', kick: 0.03, look: { len: 14, w: 4 } },
+  // 2 щита на орбите 58: 14 / 0.3 = 47 по задетым, сбивают вражеские пули
+  { id: 'bulwark', name: 'w.bulwark.name', desc: 'w.bulwark.desc', tags: ['melee', 'turret'], dmgClass: 'melee', kind: 'orbit',
+    damage: 9.5, cooldown: 0.3, range: 58, orbitR: 58, blades: 2, blockBullets: true,
+    color: '#8fd8ff', sfx: 'swing', kick: 0, look: { len: 8, w: 10 } },
+  // 120 / 2.2 = 55, пробивает 2, крит ×3
+  { id: 'sniper', name: 'w.sniper.name', desc: 'w.sniper.desc', tags: ['ballistic'], dmgClass: 'ranged', kind: 'bullet',
+    damage: 120, cooldown: 2.2, range: 820, speed: 2600, pellets: 1, spread: 0, pierce: 2, bulletR: 3, critMult: 3,
+    color: '#eef3ed', sfx: 'shoot.rail', kick: 0.18, look: { len: 26, w: 4 } },
+  // 5 / 0.22 = 23 → раскрутка до ×3 = 68
+  { id: 'minigun', name: 'w.minigun.name', desc: 'w.minigun.desc', tags: ['ballistic'], dmgClass: 'ranged', kind: 'bullet',
+    damage: 5, cooldown: 0.22, range: 380, speed: 1300, pellets: 1, spread: 0.11, pierce: 1, bulletR: 2, spin: true,
+    color: '#ffc163', sfx: 'shoot.nailer', kick: 0.01, look: { len: 18, w: 8 } },
+  // 22 / 1.0 туда и обратно сквозь всех (до 44 по цели)
+  { id: 'disk', name: 'w.disk.name', desc: 'w.disk.desc', tags: ['ballistic', 'melee'], dmgClass: 'ranged', kind: 'bullet',
+    damage: 22, cooldown: 1.0, range: 380, speed: 700, pellets: 1, spread: 0, pierce: 99, bulletR: 8, boomerang: true,
+    color: '#62ecd2', sfx: 'swing', kick: 0.03, look: { len: 10, w: 10 } },
+  // 24 / 1.3 = 18 по каждому на пути медленного шара (толпа)
+  { id: 'plasma', name: 'w.plasma.name', desc: 'w.plasma.desc', tags: ['energy'], dmgClass: 'energy', kind: 'bullet',
+    damage: 24, cooldown: 1.3, range: 460, speed: 260, pellets: 1, spread: 0, pierce: 99, bulletR: 12,
+    color: '#b4a0ff', sfx: 'shoot.laser', kick: 0.05, look: { len: 16, w: 9 } },
+  // 16 + стягивание R110 на 70 px / 1.6: собирает толпу под взрывы
+  { id: 'gravigun', name: 'w.gravigun.name', desc: 'w.gravigun.desc', tags: ['energy', 'element'], dmgClass: 'energy', kind: 'bullet',
+    damage: 16, cooldown: 1.6, range: 480, speed: 650, pellets: 1, spread: 0, pierce: 1, bulletR: 6, explodeR: 110, pull: 70,
+    color: '#9f7bff', sfx: 'shoot.arc', kick: 0.06, look: { len: 16, w: 8 } },
 ];
 
 /** Оценка DPS тира I по одной цели (без статов): для UI и тестов баланса. */

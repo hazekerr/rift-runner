@@ -506,8 +506,30 @@ export const WEAPON_ART: Record<string, (g: G, c: string, glow: boolean) => void
   mortar(g, c) { rect(g, -6, -6, 8, 12, '#2a1a12', c); rect(g, 2, -5, 10, 10, '#3a2016', c); rect(g, 11, -5, 2, 10, c); },
   turret(g, c, glow) { poly(g, 7, 4, Math.PI / 4); hull(g, c, glow, '#10232a', 1.2); rect(g, 0, -1.5, 10, 3, c); },
   saw(g, c) { g.beginPath(); g.arc(0, 0, 5, 0, TAU); g.fillStyle = '#2b3438'; g.fill(); g.strokeStyle = c; g.lineWidth = 1; g.stroke(); },
+  hammer(g, c, glow) { rect(g, -6, -1.5, 16, 3, '#4a3a2a'); rect(g, 8, -7, 8, 14, '#3a2a16', c, 1.4); if (glow) core(g, 12, 0, 1.6, c, glow); },
+  spear(g, c, glow) { rect(g, -8, -1.2, 24, 2.4, '#8a9aa0'); if (glow) { g.shadowColor = c; g.shadowBlur = 6; } g.fillStyle = '#e8f6ff'; pts(g, [[16, -3.5], [26, 0], [16, 3.5]]); g.fill(); g.shadowBlur = 0; },
+  claws(g, c, glow) { rect(g, -6, -4, 8, 8, '#3a1a22', c); for (const y of [-4, 0, 4]) { if (glow) { g.shadowColor = c; g.shadowBlur = 4; } line(g, c, 1.6, 2, y, 12, y * 1.5); g.shadowBlur = 0; } },
+  whip(g, c) { rect(g, -6, -2, 7, 4, '#3a3016', c); g.strokeStyle = c; g.lineWidth = 1.6; g.beginPath(); g.moveTo(1, 0); g.bezierCurveTo(8, -8, 12, 8, 18, -2); g.stroke(); },
+  bulwark(g, c, glow) { g.beginPath(); g.arc(0, 0, 7, -1.2, 1.2); g.lineTo(0, 0); g.closePath(); hull(g, c, glow, '#16283a', 1.4); },
+  sniper(g, c, glow) { rect(g, -8, -2.5, 10, 5, '#2b3438', c); rect(g, 2, -1.2, 22, 2.4, '#3a4448', c); rect(g, -2, -6, 8, 3, '#2b3438', c); if (glow) core(g, 24, 0, 1.4, c, glow); },
+  minigun(g, c) { rect(g, -6, -5, 8, 10, '#2a2116', c); for (const y of [-3.5, 0, 3.5]) rect(g, 2, y - 1, 13, 2, '#4a3a22', c, 0.8); rect(g, 13, -5, 2.5, 10, c); },
+  disk(g, c, glow) { g.beginPath(); g.arc(2, 0, 6, 0, TAU); hull(g, c, glow, '#10282a', 1.4); g.beginPath(); g.arc(2, 0, 2, 0, TAU); g.fillStyle = c; g.fill(); },
+  plasma(g, c, glow) { rect(g, -6, -4, 12, 8, '#221a36', c); g.beginPath(); g.arc(11, 0, 4.5, 0, TAU); hull(g, c, glow, '#2e2450', 1.2); if (glow) core(g, 11, 0, 2, c, glow); },
+  gravigun(g, c, glow) { rect(g, -6, -3, 12, 6, '#1e1636', c); for (const r of [3, 5.5]) { g.beginPath(); g.arc(12, 0, r, 0, TAU); g.strokeStyle = c; g.lineWidth = 1.2; g.stroke(); } if (glow) core(g, 12, 0, 1.5, c, glow); },
   laser(g, c, glow) { rect(g, -6, -3, 14, 6, '#2a1428', c); pts(g, [[8, -4], [18, 0], [8, 4]]); g.fillStyle = '#4a1c44'; g.fill(); g.strokeStyle = c; g.stroke(); if (glow) core(g, 18, 0, 1.8, c, glow); },
 };
+
+/** Щит на орбите (оружие «Щиты»): выгнутая пластина, смотрит наружу. */
+export function paintShieldPlate(g: G, c: string, glow: boolean): void {
+  g.beginPath();
+  g.arc(-6, 0, 18, -0.9, 0.9);
+  g.arc(-6, 0, 11, 0.9, -0.9, true);
+  g.closePath();
+  hull(g, c, glow, '#16283a', 1.8);
+  g.strokeStyle = alpha('#eef3ed', 0.5);
+  g.lineWidth = 1;
+  g.beginPath(); g.arc(-6, 0, 14.5, -0.6, 0.6); g.stroke();
+}
 
 /** Диск пилы (вращается при отрисовке). */
 export function paintSawDisc(g: G, c: string, glow: boolean): void {

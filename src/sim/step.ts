@@ -1,4 +1,4 @@
-import { SHIELD } from '../content/enemies';
+import { SHIELD, isBoss } from '../content/enemies';
 /**
  * Шаг симуляции (dt = 1/60). Порядок систем: ввод/оператор → волна/спавн → враги → оружие →
  * снаряды → мины → скрап и подборы → таймер волны.
@@ -88,9 +88,9 @@ function updatePlayer(s: SimState, inp: TickInput, dt: number, ev: EventSink): v
   p.lifestealCd = Math.max(0, p.lifestealCd - dt);
   p.energy = Math.min(100, p.energy + dt * 1.7 * (1 + p.fx.energyRegenPct / 100));
   s.comboTime -= dt;
-  // Реген: R HP за 5 с
+  // Реген: R HP за 8 с (2.0: было 5 — реген покрывал весь урон волны)
   if (p.stats.regen > 0 && p.hp < maxHpOf(p)) {
-    p.regenAcc += (p.stats.regen / 5) * dt;
+    p.regenAcc += (p.stats.regen / 8) * dt;
     if (p.regenAcc >= 1) {
       const add = Math.floor(p.regenAcc);
       p.regenAcc -= add;
@@ -119,6 +119,17 @@ function updateBullets(s: SimState, dt: number, ev: EventSink): void {
     const b = s.bullets[i]!;
     b.px = b.x;
     b.py = b.y;
+    // бумеранг: на полпути разворачивается к оператору, режет повторно, исчезает у оператора
+    if (b.boom !== undefined) {
+      if (!b.ret && b.life <= b.boom + 1.5) { b.ret = true; b.hit.length = 0; }
+      if (b.ret) {
+        const dd = Math.hypot(p.x - b.x, p.y - b.y) || 1;
+        const sp = Math.hypot(b.vx, b.vy);
+        b.vx = ((p.x - b.x) / dd) * sp;
+        b.vy = ((p.y - b.y) / dd) * sp;
+        if (dd < 24) b.life = 0;
+      }
+    }
     b.x += b.vx * dt;
     b.y += b.vy * dt;
     b.life -= dt;
@@ -167,7 +178,7 @@ function updateBullets(s: SimState, dt: number, ev: EventSink): void {
           }
           if (b.slowPct) { e.slow = 1.2; e.slowPct = Math.max(e.slowPct, b.slowPct); }
           if (b.explodeR) {
-            blast(s, b.x, b.y, b.explodeR, b.damage, b.crit, b.weapon, ev);
+            blast(s, b.x, b.y, b.explodeR, b.damage, b.crit, b.weapon, ev, b.pull ?? 0);
             dead = true;
             break;
           }
@@ -190,7 +201,7 @@ function updateBullets(s: SimState, dt: number, ev: EventSink): void {
 }
 
 /** Взрыв оружия оператора (ракета, мина, миномёт): урон всем в радиусе. */
-function blast(s: SimState, x: number, y: number, r: number, dmg: number, crit: boolean, weapon: string, ev: EventSink): void {
+function blast(s: SimState, x: number, y: number, r: number, dmg: number, crit: boolean, weapon: string, ev: EventSink, pull = 0): void {
   ev.push({ t: 'ring', x, y, color: '#ff9a5a', max: r, life: 0.3 });
   ev.push({ t: 'burst', x, y, color: '#ff9a5a', n: 12, force: 240 });
   ev.push({ t: 'shake', v: 3 });
@@ -200,7 +211,11 @@ function blast(s: SimState, x: number, y: number, r: number, dmg: number, crit: 
   hits.sort((a, b) => a - b);
   for (const i of hits) {
     const e = s.enemies[i]!;
-    if (!e.dead && Math.hypot(e.x - x, e.y - y) <= r + e.r) damageEnemy(s, e, dmg, crit, weapon, ev);
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (e.dead || d > r + e.r) continue;
+    damageEnemy(s, e, dmg, crit, weapon, ev);
+    // гравиган: стянуть к центру (боссов не двигаем)
+    if (pull > 0 && !e.dead && !isBoss(e.type) && d > 1) move(s, e, ((x - e.x) / d) * Math.min(pull, d), ((y - e.y) / d) * Math.min(pull, d));
   }
 }
 

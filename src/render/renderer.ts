@@ -6,7 +6,7 @@ import { PALETTE } from '../content/palette';
 import { weaponById } from '../content/weapons';
 import { isBoss } from '../content/enemies';
 import { bladePos } from '../sim/weapons';
-import { ENEMY_ART, enemyHalf, paintEnemyMine, paintMine, paintPickup, paintPlayer, paintSawDisc, paintScrap, paintTurret, paintTurretGun, SpriteBank, WEAPON_ART, type Sprite } from './sprites';
+import { ENEMY_ART, enemyHalf, paintEnemyMine, paintMine, paintPickup, paintPlayer, paintSawDisc, paintShieldPlate, paintScrap, paintTurret, paintTurretGun, SpriteBank, WEAPON_ART, type Sprite } from './sprites';
 import { t } from '../i18n';
 import type { Enemy, SimState } from '../sim/state';
 import type { Camera } from './camera';
@@ -784,12 +784,15 @@ export class Renderer {
     for (const w of p.weapons) {
       const def = weaponById(w.id);
       if (def.kind === 'orbit') {
-        const disc = this.sprites.get('saw', 18, (g, glow) => paintSawDisc(g, def.color, glow));
+        const plate = !!def.blockBullets;
+        const disc = plate
+          ? this.sprites.get('plate', 22, (g, glow) => paintShieldPlate(g, def.color, glow))
+          : this.sprites.get('saw', 18, (g, glow) => paintSawDisc(g, def.color, glow));
         for (let k = 0; k < (def.blades ?? 2); k++) {
           const b = bladePos(s, w, def, k);
           ctx.save();
           ctx.translate(b.x + dx, b.y + dy);
-          ctx.rotate(s.time * 20);
+          ctx.rotate(plate ? Math.atan2(b.y - w.y, b.x - w.x) : s.time * 20);
           ctx.drawImage(disc.canvas, -disc.half, -disc.half, disc.half * 2, disc.half * 2);
           ctx.restore();
         }

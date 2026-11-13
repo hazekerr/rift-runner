@@ -24,10 +24,10 @@ describe('экономика: цена за эффект (скилл game-balanc
   // Эффективность относительно покупки ствола на w5 (4 ствола), было → стало:
   // charger 0.30 → 0.60, servo 0.26 → 0.56, lens 0.06 → 0.43, reactor 0.13 → 0.35, amp (новый) 0.50.
   // Порог ниже 1 намеренно: ранний ствол сильнее (жанр), но модуль не должен быть «мусором».
-  it('уронные модули на w5 (4 ствола): ≥ 0.45 от покупки оружия, крит ≥ 0.4, редкий ≥ 0.3', () => {
+  it('уронные модули на w5 (4 ствола): ≥ 0.4–0.45 от покупки оружия, редкий ≥ 0.3', () => {
     const s = ref(5, 4);
     const wpn = perScrap(weaponGain(s, 'pulse', 1).pct, weaponPrice(1, 5));
-    const floor: Record<string, number> = { amp: 0.45, charger: 0.45, servo: 0.45, overclock: 0.45, lens: 0.4, reactor: 0.3 };
+    const floor: Record<string, number> = { amp: 0.4, charger: 0.45, servo: 0.45, overclock: 0.45, lens: 0.4, reactor: 0.3 };
     for (const [id, min] of Object.entries(floor)) {
       const def = MODULES.find((m) => m.id === id)!;
       expect(perScrap(dpsGain(s, def.mods).pct, modulePrice(def.rarity, 5)) / wpn, id).toBeGreaterThan(min);

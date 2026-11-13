@@ -21,7 +21,7 @@ export function waveTime(w: number): number {
 
 /**
  * «Разлом открыт» (план 2.0, решение 1Б): после Стража (волны 11–19) спавн ×1.8, орда раз в волну,
- * HP растёт быстрее (1.06 вместо 1.04 за волну после 10-й), урон +35%.
+ * HP растёт быстрее (1.06 вместо 1.04 за волну после 10-й), урон +50%.
  */
 export const BREACH_FROM = 11;
 export const BREACH_SPAWN = 1.8;
@@ -42,7 +42,7 @@ export function enemyHpMult(w: number): number {
 }
 
 export function enemyDmgMult(w: number): number {
-  const base = (1 + 0.12 * (w - 1)) * (w > 10 ? 1.35 : 1);
+  const base = (1 + 0.12 * (w - 1)) * (w > 10 ? 1.5 : 1);
   return w > RUN_WAVES ? base * 1.06 ** (w - RUN_WAVES) : base;
 }
 

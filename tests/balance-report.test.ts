@@ -97,6 +97,7 @@ describe.skipIf(!process.env.BALANCE_REPORT)('баланс-прогон', () => 
     const seeds = [1, 2, 3, 4, 5, 6];
     const runs = seeds.map((sd) => runBot(sd, 'operator'));
     const welder = [1, 2, 3].map((sd) => runBot(sd, 'welder'));
+    const butcher = [1, 2, 3].map((sd) => runBot(sd, 'butcher'));
     const lines: string[] = [];
     lines.push('# Баланс-отчёт', '', '> Сгенерировано `npm run balance` (бот `src/sim/bot.ts`, настоящий сим). Бот слабее живого игрока — это нижняя граница проходимости.', '');
     lines.push('## Кривые (формулы `src/content/balance.ts`)', '', '| Волна | Таймер, с | Спавн/с | HP врагов × | Урон врагов × | Оружие I / II / III / IV | Модуль ст./ул./пр./ан. | Реролл |', '|---|---|---|---|---|---|---|---|');
@@ -107,6 +108,8 @@ describe.skipIf(!process.env.BALANCE_REPORT)('баланс-прогон', () => 
     for (const r of runs) lines.push(`| ${r.seed} | ${r.reached} | ${r.won ? 'да' : 'нет'} | ${r.killedBy || '—'} |`);
     lines.push('', '### Сварщик (только ближний бой, бот в стиле «ближний»)', '', '| Сид | Дошёл до волны | Победа | Причина смерти |', '|---|---|---|---|');
     for (const r of welder) lines.push(`| ${r.seed} | ${r.reached} | ${r.won ? 'да' : 'нет'} | ${r.killedBy || '—'} |`);
+    lines.push('', '### Мясник (ближний бой, лечится ударами)', '', '| Сид | Дошёл до волны | Победа | Причина смерти |', '|---|---|---|---|');
+    for (const r of butcher) lines.push(`| ${r.seed} | ${r.reached} | ${r.won ? 'да' : 'нет'} | ${r.killedBy || '—'} |`);
     lines.push('', '## Медианы по волнам', '', '| Волна | Требуемый DPS | DPS бота | HP в конце / макс | Получено урона | Лечение: аптечки / прочее | Пик живых | Убийств | Скрап после | Уровень | n |', '|---|---|---|---|---|---|---|---|---|---|---|');
     for (let w = 1; w <= 20; w++) {
       const rs = runs.map((r) => r.rows[w - 1]).filter((x): x is WaveRow => !!x);

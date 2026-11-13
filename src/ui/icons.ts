@@ -3,7 +3,7 @@
  * Рисуются кодом один раз и кешируются как data-URL (вставляются через <img>).
  * Оружие — тот же силуэт, что на орбите (WEAPON_ART); модули и статы — неоновые пиктограммы.
  */
-import { ENEMY_ART, WEAPON_ART, paintEnemyMine, paintSawDisc } from '../render/sprites';
+import { ENEMY_ART, WEAPON_ART, paintEnemyMine, paintSawDisc, paintShieldPlate } from '../render/sprites';
 import { ENEMIES, type EnemyType } from '../content/enemies';
 import { RARITY_COLOR } from '../content/levelups';
 import { moduleById } from '../content/modules';
@@ -139,7 +139,7 @@ export function weaponIconUrl(id: string, tier = 0): string {
     if (def.kind === 'orbit') {
       g.translate(24, 24);
       g.scale(1.4, 1.4);
-      paintSawDisc(g, def.color, true);
+      if (def.blockBullets) { g.translate(4, 0); paintShieldPlate(g, def.color, true); } else paintSawDisc(g, def.color, true);
     } else {
       // силуэт оружия (ствол вдоль +x) по диагонали, масштаб ×1.7
       g.translate(14, 33);

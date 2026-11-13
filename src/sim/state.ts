@@ -22,6 +22,8 @@ export interface WeaponInst {
   /** Мировая позиция на орбите (обновляется каждый тик). */
   x: number;
   y: number;
+  /** Раскрутка (миниган), 0..1. */
+  heat?: number;
 }
 
 export interface Player {
@@ -80,6 +82,8 @@ export interface Bullet {
   pierce: number; hit: number[]; weapon: string; source: EnemyType | '';
   /** Свойства оружия: взрыв при попадании, шанс поджога, замедление. */
   explodeR: number; burnChance: number; slowPct: number;
+  /** 2.0: бумеранг (момент разворота по остатку жизни; ret — уже летит назад) и стягивание при взрыве. */
+  boom?: number; ret?: boolean; pull?: number;
 }
 
 /** Мина или снаряд миномёта оператора. */

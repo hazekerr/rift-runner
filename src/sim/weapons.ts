@@ -8,7 +8,8 @@ import { damageEnemy, rollWeaponDamage } from './combat';
 import type { EventSink } from './events';
 import type { TickInput } from './input';
 import { cooldownOf } from './stats';
-import type { Enemy, SimState, WeaponInst } from './state';
+import { healPlayer, type Enemy, type SimState, type WeaponInst } from './state';
+import { chance } from '../core/rng';
 import { isBoss } from '../content/enemies';
 import { enemyHash, MAX_ENEMY_R, move, nearestEnemy } from './world';
 
@@ -48,10 +49,13 @@ export function updateWeapons(s: SimState, inp: TickInput, dt: number, ev: Event
     inst.y = p.y + (n > 1 ? Math.sin(oa) * ORBIT_R : 0);
     inst.cd -= dt;
     inst.flash = Math.max(0, inst.flash - dt);
+    // раскрутка остывает, когда нет цели (cd ушёл далеко в минус)
+    if (def.spin && inst.cd < -0.25) inst.heat = Math.max(0, (inst.heat ?? 0) - dt * 0.9);
     if (!allowed) continue;
     const rangeV = weaponRange(s, def);
 
     if (def.kind === 'orbit') {
+      if (def.blockBullets) blockBullets(s, def, inst, ev);
       if (inst.cd > 0) continue;
       orbitHit(s, def, inst, ev);
       inst.cd = weaponCooldown(s, def, inst);
@@ -74,17 +78,40 @@ export function updateWeapons(s: SimState, inp: TickInput, dt: number, ev: Event
     if (manual && def.kind === 'chain' && target < 0) continue;
     if (def.kind === 'turret' && s.turrets.filter((t) => t.weapon === `${inst.uid}`).length >= (def.turretMax ?? 1)) continue;
     fire(s, def, inst, rangeV, target, manual ? { x: inp.aimX, y: inp.aimY } : null, ev);
-    inst.cd = weaponCooldown(s, def, inst);
+    if (def.spin) inst.heat = Math.min(1, (inst.heat ?? 0) + 0.1);
+    inst.cd = weaponCooldown(s, def, inst) / (def.spin ? 1 + 2 * (inst.heat ?? 0) : 1);
     inst.flash = 0.08;
   }
+}
+
+/** Оглушение и встроенный вампиризм ближнего оружия. */
+function meleeExtras(s: SimState, def: WeaponDef, e: Enemy): void {
+  if (def.stun && !e.dead && !isBoss(e.type)) { e.slow = Math.max(e.slow, def.stun); e.slowPct = 100; }
+  const leech = (def.leech ?? 0) + (operatorById(s.operator).rule.meleeHeal ?? 0);
+  if (leech > 0 && chance(s.rng.combat, leech / 100)) healPlayer(s, 1, 'lifesteal');
 }
 
 /** Отбросить врага от точки удара (не боссов). */
 function knockBack(s: SimState, e: Enemy, fx: number, fy: number, px: number): void {
   if (px <= 0 || e.dead || isBoss(e.type)) return;
   const d = Math.hypot(e.x - fx, e.y - fy) || 1;
-  const k = e.type === 'tank' ? 0.4 : 1;
+  // танки и элиты держат удар; 2.0: стек отбрасывания делал ближний бой неуязвимым (бот получал 20–50 урона за волну)
+  const k = e.type === 'tank' || e.type === 'armadillo' || e.elite ? 0.4 : 1;
   move(s, e, ((e.x - fx) / d) * px * k, ((e.y - fy) / d) * px * k);
+}
+
+/** Щиты на орбите сбивают вражеские пули — каждый тик, независимо от перезарядки удара. */
+function blockBullets(s: SimState, def: WeaponDef, inst: WeaponInst, ev: EventSink): void {
+  for (let k = 0; k < (def.blades ?? 2); k++) {
+    const b = bladePos(s, inst, def, k);
+    for (let i = s.bullets.length - 1; i >= 0; i--) {
+      const q = s.bullets[i]!;
+      if (q.friendly || Math.hypot(q.x - b.x, q.y - b.y) > 20 + q.r) continue;
+      ev.push({ t: 'burst', x: q.x, y: q.y, color: def.color, n: 3, force: 90 });
+      s.bullets[i] = s.bullets[s.bullets.length - 1]!;
+      s.bullets.pop();
+    }
+  }
 }
 
 function orbitHit(s: SimState, def: WeaponDef, inst: WeaponInst, ev: EventSink): void {
@@ -97,6 +124,7 @@ function orbitHit(s: SimState, def: WeaponDef, inst: WeaponInst, ev: EventSink):
       const { dmg, crit } = rollWeaponDamage(s, def, inst);
       damageEnemy(s, e, dmg, crit, def.id, ev);
       knockBack(s, e, b.x, b.y, def.knock ?? 0);
+      meleeExtras(s, def, e);
       any = true;
     });
   }
@@ -125,6 +153,8 @@ function fire(s: SimState, def: WeaponDef, inst: WeaponInst, rangeV: number, tar
           life: rangeV / speed, damage: dmg, crit, color: def.color, friendly: true, r: def.bulletR ?? 3,
           pierce: (def.pierce ?? 1) + (ballistic ? fx.pierceBonus : 0), hit: [], weapon: def.id, source: '',
           explodeR: (def.explodeR ?? 0) * fx.explodeRadiusMult, burnChance: def.burnChance ?? 0, slowPct: def.slowPct ?? 0,
+          ...(def.boomerang ? { boom: rangeV / speed / 2, life: rangeV / speed + 1.5 } : {}),
+          ...(def.pull ? { pull: def.pull } : {}),
         });
       }
       ev.push({ t: 'burst', x: sx, y: sy, color: def.color, n: 3, force: 90 });
@@ -143,6 +173,7 @@ function fire(s: SimState, def: WeaponDef, inst: WeaponInst, rangeV: number, tar
         const { dmg, crit } = rollWeaponDamage(s, def, inst);
         damageEnemy(s, e, dmg, crit, def.id, ev);
         knockBack(s, e, inst.x, inst.y, def.knock ?? 0);
+        meleeExtras(s, def, e);
       });
       ev.push({ t: 'swing', x: inst.x, y: inst.y, a, arc, r: rangeV, color: def.color });
       break;
@@ -198,8 +229,10 @@ function fire(s: SimState, def: WeaponDef, inst: WeaponInst, rangeV: number, tar
         if (e.dead || segDistance(sx, sy, ex, ey, e.x, e.y) > e.r + 6) continue;
         const { dmg, crit } = rollWeaponDamage(s, def, inst);
         damageEnemy(s, e, dmg, crit, def.id, ev);
+        knockBack(s, e, sx, sy, def.knock ?? 0);
+        meleeExtras(s, def, e);
       }
-      ev.push({ t: 'beam', pts: [sx, sy, ex, ey], color: def.color, life: 0.15, straight: true });
+      ev.push({ t: 'beam', pts: [sx, sy, ex, ey], color: def.color, life: def.dmgClass === 'melee' ? 0.08 : 0.15, straight: true });
       break;
     }
     default:

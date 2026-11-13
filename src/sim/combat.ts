@@ -26,7 +26,7 @@ export function rollWeaponDamage(s: SimState, def: WeaponDef, inst: WeaponInst):
   const mult = Math.max(0.1, 1 + (st.damage + cls + low) / 100);
   const crit = chance(s.rng.combat, clamp(st.crit, 0, 100) / 100);
   const manual = operatorById(s.operator).rule.manualOnly ?? 1;
-  return { dmg: def.damage * TIER_MULT[inst.tier - 1]! * mult * manual * (crit ? CRIT_MULT : 1), crit };
+  return { dmg: def.damage * TIER_MULT[inst.tier - 1]! * mult * manual * (crit ? def.critMult ?? CRIT_MULT : 1), crit };
 }
 
 export function dropScrap(s: SimState, x: number, y: number, value: number): void {
@@ -159,7 +159,7 @@ export function hurtPlayer(s: SimState, raw: number, source: EnemyType | 'mine',
     return;
   }
   const armor = operatorById(s.operator).rule.armorDisabled ? 0 : p.stats.armor;
-  const dmg = Math.max(1, Math.round(raw * armorMult(armor)));
+  const dmg = Math.max(1, Math.round(raw * armorMult(armor) * (operatorById(s.operator).rule.damageTakenMult ?? 1)));
   p.hp -= dmg;
   p.inv = PLAYER_IFRAMES;
   s.stats.damageTaken += dmg;
