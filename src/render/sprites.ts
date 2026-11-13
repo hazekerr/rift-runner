@@ -332,6 +332,137 @@ export const ENEMY_ART: Record<string, EnemyArt> = {
     hull(g, c, false, '#3c1222', 1.5);
     core(g, 0, 0, R * 0.3, c, glow);
   },
+  // ---------------- 2.0 ----------------
+  bomber(g, R, c, glow) {
+    // шар с фитилём и шипами-детонаторами: цвет опасности, читается как «бомба»
+    for (let k = 0; k < 8; k++) {
+      const a = (k * TAU) / 8;
+      line(g, c, 2, Math.cos(a) * R * 0.8, Math.sin(a) * R * 0.8, Math.cos(a) * R * 1.25, Math.sin(a) * R * 1.25);
+      g.fillStyle = '#ffd2c6';
+      g.beginPath(); g.arc(Math.cos(a) * R * 1.28, Math.sin(a) * R * 1.28, 1.6, 0, TAU); g.fill();
+    }
+    g.beginPath(); g.arc(0, 0, R * 0.9, 0, TAU);
+    hull(g, c, glow, '#2c0e0e', 2);
+    g.strokeStyle = alpha(c, 0.5); g.lineWidth = 1;
+    g.beginPath(); g.arc(0, 0, R * 0.6, 0, TAU); g.stroke();
+    // знак опасности
+    g.fillStyle = '#ffd166';
+    pts(g, [[R * 0.5, 0], [-R * 0.25, -R * 0.42], [-R * 0.25, R * 0.42]]);
+    g.fill();
+    core(g, 0, 0, R * 0.2, '#ffd166', glow);
+  },
+  shieldbearer(g, R, c, glow) {
+    // корпус-пятиугольник и выгнутый щит спереди (сектор ±60°)
+    poly(g, R * 0.78, 5, Math.PI);
+    hull(g, c, glow, '#16203a', 1.8);
+    g.beginPath();
+    g.arc(0, 0, R * 1.18, -1.05, 1.05);
+    g.arc(0, 0, R * 0.92, 1.05, -1.05, true);
+    g.closePath();
+    hull(g, '#bfe0ff', glow, '#1f3a66', 2.2);
+    g.strokeStyle = alpha('#bfe0ff', 0.55); g.lineWidth = 1;
+    for (const a of [-0.6, 0, 0.6]) { g.beginPath(); g.moveTo(Math.cos(a) * R * 0.95, Math.sin(a) * R * 0.95); g.lineTo(Math.cos(a) * R * 1.15, Math.sin(a) * R * 1.15); g.stroke(); }
+    core(g, -R * 0.15, 0, R * 0.22, c, glow);
+  },
+  leaper(g, R, c, glow) {
+    // поджатые ноги-пружины
+    for (const sgn of [-1, 1]) {
+      line(g, c, 2.2, -R * 0.2, sgn * R * 0.5, -R * 0.9, sgn * R * 1.05, -R * 0.3, sgn * R * 1.25);
+      line(g, c, 2.2, R * 0.3, sgn * R * 0.45, R * 0.75, sgn * R * 1.1, R * 1.2, sgn * R * 0.95);
+    }
+    poly(g, R * 0.82, 6);
+    hull(g, c, glow, '#2e1430', 2);
+    pts(g, [[R * 0.9, 0], [R * 0.35, -R * 0.32], [R * 0.35, R * 0.32]]);
+    hull(g, c, false, '#4a1f48', 1.2);
+    core(g, -R * 0.1, 0, R * 0.24, c, glow);
+  },
+  sniper(g, R, c, glow) {
+    // узкий корпус и очень длинный ствол с прицелом
+    pts(g, [[R * 0.6, 0], [-R * 0.9, -R * 0.8], [-R * 0.5, 0], [-R * 0.9, R * 0.8]]);
+    hull(g, c, glow, '#132a1a', 1.8);
+    rect(g, R * 0.2, -2.5, R * 1.5, 5, '#24402b', c);
+    rect(g, R * 1.62, -3.5, 4, 7, c);
+    g.beginPath(); g.arc(R * 0.55, -6, 3.2, 0, TAU);
+    hull(g, c, false, '#24402b', 1.2);
+    core(g, -R * 0.2, 0, R * 0.2, c, glow);
+  },
+  thief(g, R, c, glow) {
+    // юркий треугольник с подковой-магнитом спереди
+    pts(g, [[R * 0.6, 0], [-R * 0.9, -R * 0.75], [-R * 0.55, 0], [-R * 0.9, R * 0.75]]);
+    hull(g, c, glow, '#0e2a2e', 1.8);
+    g.beginPath(); g.arc(R * 0.8, 0, R * 0.5, -Math.PI / 2, Math.PI / 2);
+    g.strokeStyle = '#ff6d8a'; g.lineWidth = 3.4; g.stroke();
+    rect(g, R * 0.62, -R * 0.62, 5, 4, '#eef3ed');
+    rect(g, R * 0.62, R * 0.62 - 4, 5, 4, '#eef3ed');
+    core(g, -R * 0.25, 0, R * 0.2, c, glow);
+  },
+  hive(g, R, c, glow) {
+    // соты: центральная и шесть вокруг
+    for (let k = 0; k < 6; k++) {
+      const a = (k * TAU) / 6;
+      poly(g, R * 0.38, 6, 0, Math.cos(a) * R * 0.64, Math.sin(a) * R * 0.64);
+      hull(g, c, glow && k % 2 === 0, '#2e2610', 1.4);
+      g.fillStyle = '#120f06';
+      g.beginPath(); g.arc(Math.cos(a) * R * 0.64, Math.sin(a) * R * 0.64, R * 0.14, 0, TAU); g.fill();
+    }
+    poly(g, R * 0.42, 6);
+    hull(g, c, false, '#3a3014', 1.6);
+    core(g, 0, 0, R * 0.2, c, glow);
+  },
+  armadillo(g, R, c, glow) {
+    // сегментированный панцирь из пластин
+    g.beginPath(); g.ellipse(0, 0, R * 1.05, R * 0.85, 0, 0, TAU);
+    hull(g, c, glow, '#2e2216', 2.4);
+    g.strokeStyle = alpha(c, 0.75); g.lineWidth = 1.6;
+    for (const x of [-0.55, -0.15, 0.25]) {
+      g.beginPath(); g.ellipse(x * R, 0, R * 0.22, R * 0.78, 0, -Math.PI / 2, Math.PI / 2); g.stroke();
+    }
+    rect(g, R * 0.7, -R * 0.28, R * 0.42, R * 0.56, '#4a3622', c, 1.5);
+    g.fillStyle = '#ffd2a0';
+    g.beginPath(); g.arc(R * 1.0, -R * 0.12, 1.8, 0, TAU); g.arc(R * 1.0, R * 0.12, 1.8, 0, TAU); g.fill();
+    core(g, -R * 0.35, 0, R * 0.16, c, glow);
+  },
+  phantom(g, R, c, glow) {
+    // полупрозрачный «плащ» и двоящийся контур
+    g.globalAlpha = 0.35;
+    poly(g, R * 1.12, 7, 0.2);
+    hull(g, c, false, '#1e1430', 1.2);
+    g.globalAlpha = 1;
+    poly(g, R * 0.86, 7);
+    hull(g, c, glow, '#1e1430', 1.8);
+    g.strokeStyle = alpha(c, 0.5); g.lineWidth = 1;
+    for (let k = 0; k < 7; k++) { const a = (k * TAU) / 7; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * R * 0.86, Math.sin(a) * R * 0.86); g.stroke(); }
+    core(g, R * 0.15, 0, R * 0.26, '#f0e4ff', glow);
+  },
+  crusher(g, R, c, glow) {
+    // мини-босс «Дробитель»: таран-клин и бронированный восьмиугольник
+    pts(g, [[R * 1.25, 0], [R * 0.55, -R * 0.75], [R * 0.55, R * 0.75]]);
+    hull(g, '#ffd2a0', glow, '#4a2412', 2.2);
+    poly(g, R * 0.9, 8, Math.PI / 8);
+    hull(g, c, glow, '#331a10', 2.4);
+    poly(g, R * 0.6, 8, Math.PI / 8);
+    g.strokeStyle = alpha(c, 0.55); g.lineWidth = 1.4; g.stroke();
+    for (const sgn of [-1, 1]) rect(g, -R * 0.95, sgn * R * 0.55 - 5, R * 0.5, 10, '#4a2412', c, 1.4);
+    g.fillStyle = alpha(c, 0.85);
+    for (let k = 0; k < 8; k++) { const a = (k * TAU) / 8; g.beginPath(); g.arc(Math.cos(a) * R * 0.75, Math.sin(a) * R * 0.75, 2, 0, TAU); g.fill(); }
+    core(g, 0, 0, R * 0.26, c, glow);
+  },
+  brood(g, R, c, glow) {
+    // мини-босс «Рой-матка»: брюшко с кладкой и жвалами
+    for (const sgn of [-1, 1]) {
+      line(g, c, 3, R * 0.6, sgn * R * 0.3, R * 1.1, sgn * R * 0.55, R * 1.25, sgn * R * 0.2);
+    }
+    g.beginPath(); g.ellipse(-R * 0.15, 0, R * 1.0, R * 0.85, 0, 0, TAU);
+    hull(g, c, glow, '#1e2a0c', 2.4);
+    g.fillStyle = alpha(c, 0.35);
+    for (let k = 0; k < 9; k++) {
+      const a = (k * TAU) / 9;
+      g.beginPath(); g.arc(-R * 0.2 + Math.cos(a) * R * 0.55, Math.sin(a) * R * 0.48, R * 0.13, 0, TAU); g.fill();
+    }
+    g.beginPath(); g.arc(R * 0.55, 0, R * 0.32, 0, TAU);
+    hull(g, c, false, '#2c3a10', 1.6);
+    core(g, -R * 0.2, 0, R * 0.24, c, glow);
+  },
 };
 
 /** Половина размера холста спрайта врага (с запасом под стволы и свечение). */

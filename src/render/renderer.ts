@@ -1,6 +1,7 @@
+import { clamp01 } from '../content/balance';
 import { TAU, clamp, lerp } from '../core/math';
 import { ARENA_CENTER, WORLD, makeArena, type ObstacleDef } from '../content/arena';
-import { AURA_COLOR, AURA_GLYPH, ELITE, ENEMIES, MINE, RUNNER_DASH } from '../content/enemies';
+import { AURA_COLOR, AURA_GLYPH, BOMBER, ELITE, ENEMIES, LEAP, MINE, PHASE, RUNNER_DASH, SNIPE } from '../content/enemies';
 import { PALETTE } from '../content/palette';
 import { weaponById } from '../content/weapons';
 import { isBoss } from '../content/enemies';
@@ -491,6 +492,8 @@ export class Renderer {
         ctx.lineTo(ex + e.vx * RUNNER_DASH.speed * RUNNER_DASH.time, ey + e.vy * RUNNER_DASH.speed * RUNNER_DASH.time);
         ctx.stroke();
       }
+      // 2.0: телеграфы новых врагов
+      if (e.ai === 1 || (e.type === 'leaper' && e.ai === 2)) this.drawEnemyTele(e, ex, ey);
       if (e.elite) {
         // радиус ауры — тонкое кольцо (заливка R150 у сотни элит после босса съедала кадр)
         ctx.globalAlpha = 0.28;
@@ -572,6 +575,55 @@ export class Renderer {
         ctx.fillRect(ex - w / 2, ey - e.r - 11, (w * Math.max(0, e.hp)) / e.maxHp, 3);
       }
     }
+  }
+
+  /** Телеграфы врагов 2.0: запал камикадзе, точка прыжка, луч снайпера, точка появления фантома. */
+  private drawEnemyTele(e: SimState['enemies'][number], ex: number, ey: number): void {
+    const ctx = this.ctx;
+    const now = performance.now();
+    if (e.type === 'bomber') {
+      const k = clamp01(1 - e.aiT / BOMBER.fuse);
+      ctx.fillStyle = '#ff4f4f';
+      ctx.globalAlpha = 0.1 + 0.2 * k;
+      ctx.beginPath(); ctx.arc(ex, ey, BOMBER.radius, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(now * 0.05);
+      ctx.strokeStyle = '#ff4f4f';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(ex, ey, BOMBER.radius * k, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(ex, ey, BOMBER.radius, 0, TAU); ctx.stroke();
+    } else if (e.type === 'leaper') {
+      const k = e.ai === 1 ? clamp01(1 - e.aiT / LEAP.windup) : 1;
+      ctx.strokeStyle = '#ff9ae0';
+      ctx.fillStyle = '#ff9ae0';
+      ctx.globalAlpha = 0.12 + 0.15 * k;
+      ctx.beginPath(); ctx.arc(e.vx, e.vy, LEAP.radius, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 0.85;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath(); ctx.arc(e.vx, e.vy, LEAP.radius, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(e.vx, e.vy, LEAP.radius * k, 0, TAU); ctx.stroke();
+    } else if (e.type === 'sniper') {
+      const locked = e.aiT <= SNIPE.lock;
+      ctx.strokeStyle = locked ? '#ffffff' : '#9fffb0';
+      ctx.globalAlpha = locked ? 0.9 : 0.35 + 0.25 * clamp01(1 - e.aiT / SNIPE.aim);
+      ctx.lineWidth = locked ? 2.5 : 1.2;
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex + Math.cos(e.vx) * 1300, ey + Math.sin(e.vx) * 1300);
+      ctx.stroke();
+    } else if (e.type === 'phantom') {
+      const k = clamp01(1 - e.aiT / PHASE.tele);
+      ctx.strokeStyle = '#d6b3ff';
+      ctx.globalAlpha = 0.5 + 0.4 * k;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(e.vx, e.vy, 10 + 26 * (1 - k), 0, TAU); ctx.stroke();
+      ctx.globalAlpha = 0.25;
+      ctx.setLineDash([3, 6]);
+      ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(e.vx, e.vy); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.globalAlpha = 1;
   }
 
   /** friendly=true — наши трассеры (пачкой по цвету, без shadowBlur); false — вражеские поверх эффектов. */

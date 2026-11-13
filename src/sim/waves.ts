@@ -5,7 +5,7 @@ import {
   eliteChance, enemyDmgMult, rarityWeights, rerollCost, spawnRate, waveTime, xpToNext,
 } from '../content/balance';
 import { ARENA_CENTER, WORLD } from '../content/arena';
-import { ENEMIES, isBoss, type Aura, type EnemyType } from '../content/enemies';
+import { ENEMIES, MINI_BOSS, MINI_BOSS_AT, isBoss, type Aura, type EnemyType } from '../content/enemies';
 import { LEVEL_UPS } from '../content/levelups';
 import { waveWeights } from '../content/waves';
 import { circleRect } from './collide';
@@ -28,6 +28,7 @@ export function startWave(s: SimState, ev: EventSink): void {
   s.spawnAcc = 0;
   s.burstsDone = 0;
   s.hordeDone = false;
+  s.miniDone = false;
   s.kitsThisWave = 0;
   s.overtime = false;
   s.levelRerolls = 0;
@@ -156,6 +157,13 @@ export function updateWave(s: SimState, dt: number, ev: EventSink): void {
       const progress = 1 - s.waveLeft / s.waveDuration;
       if (s.burstsDone < BURST_AT.length && progress >= BURST_AT[s.burstsDone]!) { s.burstsDone++; burst(s); }
       if (isBreach(s.wave) && !s.hordeDone && progress >= HORDE_AT) { s.hordeDone = true; horde(s, ev); }
+      const mini = MINI_BOSS[s.wave];
+      if (mini && !s.miniDone && progress >= MINI_BOSS_AT) {
+        s.miniDone = true;
+        s.spawns.push({ type: mini, x: ARENA_CENTER.x, y: 110, t: 1.2, elite: null });
+        ev.push({ t: 'toast', key: 'toast.mini', sub: 'toast.mini.sub', params: { nKey: ENEMIES[mini].name }, duration: 2.5 });
+        ev.push({ t: 'sfx', id: 'bossSpawn' });
+      }
     }
   }
   for (let i = s.spawns.length - 1; i >= 0; i--) {

@@ -262,7 +262,8 @@ function syncPhase(): void {
 }
 
 // ---------- брифинги: подсказка о новом враге/механике, один раз на профиль ----------
-const BRIEF_ENEMIES: readonly EnemyType[] = ['runner', 'gunner', 'tank', 'splitter', 'miner', 'healer', 'swarm'];
+const BRIEF_ENEMIES: readonly EnemyType[] = ['runner', 'gunner', 'tank', 'splitter', 'miner', 'healer', 'swarm',
+  'bomber', 'shieldbearer', 'leaper', 'sniper', 'thief', 'hive', 'armadillo', 'phantom', 'crusher', 'brood'];
 let briefTime = 0;
 
 function showBrief(id: string, icon: string): void {

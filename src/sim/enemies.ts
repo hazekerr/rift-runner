@@ -1,6 +1,7 @@
 import { TAU, clamp, dist } from '../core/math';
 import { range } from '../core/rng';
-import { AURA_COLOR, ELITE, HEAL_PER_SEC, HEAL_RANGE, MINE, RUNNER_DASH } from '../content/enemies';
+import { AURA_COLOR, BOMBER, ELITE, HEAL_PER_SEC, HEAL_RANGE, HIVE, LEAP, MINE, PHASE, RUNNER_DASH, SNIPE, THIEF } from '../content/enemies';
+import { MAX_ALIVE } from '../content/balance';
 import { segRect } from './collide';
 import { updateBoss } from './bosses';
 import { isBoss } from '../content/enemies';
@@ -14,10 +15,11 @@ function enemyShot(s: SimState, e: Enemy, angle: number, speed: number, dmg: num
   const x = e.x + Math.cos(angle) * (e.r + 8);
   const y = e.y + Math.sin(angle) * (e.r + 8);
   const boss = e.type === 'boss';
+  const sniper = e.type === 'sniper';
   const sp = speed * threatMods(s.threat).bulletSpeedMult;
   s.bullets.push({
     x, y, px: x, py: y, vx: Math.cos(angle) * sp, vy: Math.sin(angle) * sp, life: 5,
-    damage: dmg, crit: false, r: boss ? 7 : 6, color: boss ? '#ff6888' : '#d79aff', friendly: false, pierce: 0, hit: [],
+    damage: dmg, crit: false, r: boss ? 7 : sniper ? 5 : 6, color: boss ? '#ff6888' : sniper ? '#9fffb0' : '#d79aff', friendly: false, pierce: 0, hit: [],
     weapon: '', source: e.type, explodeR: 0, burnChance: 0, slowPct: 0,
   });
 }
@@ -88,6 +90,12 @@ export function updateEnemies(s: SimState, dt: number, ev: EventSink): void {
       if (e.ai === 3) speed *= 0.4;
     }
 
+    // ---- 2.0: особые состояния новых врагов (во время телеграфа враг не идёт обычным ходом) ----
+    if (specialAi(s, e, d, dx, dy, dt, ev)) {
+      if (d < e.r + p.r + 4 && e.contact > 0) hurtPlayer(s, e.contact, e.type, ev);
+      continue;
+    }
+
     e.a = a;
     let vx = dx / d;
     let vy = dy / d;
@@ -109,6 +117,30 @@ export function updateEnemies(s: SimState, dt: number, ev: EventSink): void {
       const back = d < 300 ? -1 : 0;
       vx = vx * back + Math.cos(a - Math.PI / 2) * 0.7;
       vy = vy * back + Math.sin(a - Math.PI / 2) * 0.7;
+    }
+    if (los && e.type === 'sniper' && d < SNIPE.keep + 140) {
+      // держит дальнюю дистанцию, медленно стрейфит
+      const back = d < SNIPE.keep ? -1 : 0;
+      vx = vx * back + Math.cos(a + Math.PI / 2) * 0.4;
+      vy = vy * back + Math.sin(a + Math.PI / 2) * 0.4;
+    }
+    if (e.type === 'thief') {
+      // к ближайшему скрапу на полу; если его нет — к оператору
+      let best = -1;
+      let bd: number = THIEF.seek;
+      for (let k = 0; k < s.scraps.length; k++) {
+        const sc = s.scraps[k]!;
+        const dd = Math.hypot(sc.x - e.x, sc.y - e.y);
+        if (dd < bd) { bd = dd; best = k; }
+      }
+      if (best >= 0) {
+        const sc = s.scraps[best]!;
+        if (bd < e.r + 8) {
+          e.loot = (e.loot ?? 0) + sc.v;
+          s.scraps[best] = s.scraps[s.scraps.length - 1]!;
+          s.scraps.pop();
+        } else { vx = (sc.x - e.x) / bd; vy = (sc.y - e.y) / bd; e.a = Math.atan2(vy, vx); }
+      }
     }
     if (e.type === 'healer') {
       // держится за спинами: позади ближайшего союзника
@@ -143,6 +175,17 @@ export function updateEnemies(s: SimState, dt: number, ev: EventSink): void {
     move(s, e, (vx / vl) * speed * dt, (vy / vl) * speed * dt);
     if (d < e.r + p.r + 4) hurtPlayer(s, e.contact, e.type, ev);
 
+    // Улей выпускает рой, пока жив
+    if (e.type === 'hive') {
+      e.shot -= dt;
+      if (e.shot < 0) {
+        e.shot = HIVE.every;
+        for (let k = 0; k < HIVE.count && s.enemies.length + s.spawns.length < MAX_ALIVE; k++) {
+          const ang = (k / HIVE.count) * TAU + e.phase;
+          s.spawns.push({ type: 'swarm', x: e.x + Math.cos(ang) * (e.r + 14), y: e.y + Math.sin(ang) * (e.r + 14), t: 0.5, elite: null });
+        }
+      }
+    }
     // Стрельба и мины
     if (e.type === 'gunner' || e.type === 'miner') {
       e.shot -= dt;
@@ -157,6 +200,89 @@ export function updateEnemies(s: SimState, dt: number, ev: EventSink): void {
         }
       }
     }
+  }
+}
+
+/**
+ * Состояния 2.0 с телеграфами. Возвращает true, если враг в этом тике занят (без обычного движения).
+ * Поля: ai — фаза, aiT — таймер фазы, vx/vy — точка или угол цели, shot — перезарядка способности.
+ */
+function specialAi(s: SimState, e: Enemy, d: number, dx: number, dy: number, dt: number, ev: EventSink): boolean {
+  const p = s.p;
+  switch (e.type) {
+    case 'bomber': {
+      if (e.ai === 0 && d < BOMBER.trigger) { e.ai = 1; e.aiT = BOMBER.fuse; ev.push({ t: 'sfx', id: 'teleWarn' }); }
+      if (e.ai !== 1) return false;
+      e.aiT -= dt;
+      if (e.aiT <= 0) {
+        if (Math.hypot(p.x - e.x, p.y - e.y) < BOMBER.radius + p.r && p.dashTime <= 0) hurtPlayer(s, e.shotDmg, e.type, ev);
+        ev.push({ t: 'ring', x: e.x, y: e.y, color: '#ff4f4f', max: BOMBER.radius, life: 0.35 });
+        ev.push({ t: 'burst', x: e.x, y: e.y, color: '#ff4f4f', n: 18, force: 260 });
+        ev.push({ t: 'sfx', id: 'mineBoom' });
+        e.dead = true; // взорвался сам — без награды
+      }
+      return true;
+    }
+    case 'leaper': {
+      e.shot -= dt;
+      if (e.ai === 0 && d < LEAP.range && e.shot < 0) { e.ai = 1; e.aiT = LEAP.windup; e.vx = p.x; e.vy = p.y; }
+      if (e.ai === 0) return false;
+      e.aiT -= dt;
+      if (e.ai === 1) {
+        e.a = Math.atan2(e.vy - e.y, e.vx - e.x);
+        if (e.aiT <= 0) { e.ai = 2; e.aiT = LEAP.time; }
+      } else {
+        const rem = Math.hypot(e.vx - e.x, e.vy - e.y);
+        const step = Math.min(rem, (rem / Math.max(dt, e.aiT)) * dt);
+        if (rem > 0.5) { e.x += ((e.vx - e.x) / rem) * step; e.y += ((e.vy - e.y) / rem) * step; }
+        if (e.aiT <= 0) {
+          if (Math.hypot(p.x - e.vx, p.y - e.vy) < LEAP.radius + p.r && p.dashTime <= 0) hurtPlayer(s, e.shotDmg, e.type, ev);
+          ev.push({ t: 'ring', x: e.vx, y: e.vy, color: '#ff9ae0', max: LEAP.radius, life: 0.3 });
+          ev.push({ t: 'shake', v: 3 });
+          e.ai = 0;
+          e.shot = LEAP.every;
+        }
+      }
+      return true;
+    }
+    case 'sniper': {
+      e.shot -= dt;
+      if (e.ai === 0 && e.shot < 0 && d < 1000 && e.los) { e.ai = 1; e.aiT = SNIPE.aim; e.vx = Math.atan2(dy, dx); }
+      if (e.ai !== 1) return false;
+      e.aiT -= dt;
+      if (e.aiT > SNIPE.lock) e.vx = Math.atan2(dy, dx); // последние 0.35 с прицел зафиксирован — можно уйти
+      e.a = e.vx;
+      if (e.aiT <= 0) {
+        enemyShot(s, e, e.vx, SNIPE.speed, e.shotDmg);
+        ev.push({ t: 'sfx', id: 'bossLaser' });
+        e.ai = 0;
+        e.shot = SNIPE.every;
+      }
+      return true;
+    }
+    case 'phantom': {
+      e.shot -= dt;
+      if (e.ai === 0 && e.shot < 0 && d > PHASE.minDist) {
+        const ang = Math.atan2(e.y - p.y, e.x - p.x) + range(s.rng.combat, -0.8, 0.8);
+        e.ai = 1;
+        e.aiT = PHASE.tele;
+        e.vx = clamp(p.x + Math.cos(ang) * PHASE.offset, 50, 1850);
+        e.vy = clamp(p.y + Math.sin(ang) * PHASE.offset, 50, 1200);
+      }
+      if (e.ai !== 1) return false;
+      e.aiT -= dt;
+      if (e.aiT <= 0) {
+        ev.push({ t: 'burst', x: e.x, y: e.y, color: '#d6b3ff', n: 10, force: 120 });
+        e.x = e.px = e.vx;
+        e.y = e.py = e.vy;
+        ev.push({ t: 'ring', x: e.x, y: e.y, color: '#d6b3ff', max: 40, life: 0.25 });
+        e.ai = 0;
+        e.shot = PHASE.every;
+      }
+      return false; // пока телеграф, фантом продолжает идти
+    }
+    default:
+      return false;
   }
 }
 

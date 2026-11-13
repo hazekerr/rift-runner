@@ -59,6 +59,8 @@ export interface Enemy {
   burn: number; burnDps: number; slow: number; slowPct: number;
   /** Телеграф атаки босса (для отрисовки предупреждения). */
   tele: Telegraph | null;
+  /** Магнитчик: украденный скрап. */
+  loot?: number;
   /** Кеш прямой видимости до игрока (пересчёт раз в 4 тика со сдвигом по id). */
   los: boolean;
 }
@@ -176,6 +178,8 @@ export interface SimState {
   kitsThisWave?: number;
   /** Орда «Разлома» в этой волне уже была. */
   hordeDone?: boolean;
+  /** Мини-босс этой волны уже вышел. */
+  miniDone?: boolean;
   levelOffer: LevelOffer[];
   levelRerolls: number;
   shop: ShopState;

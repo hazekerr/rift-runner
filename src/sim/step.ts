@@ -1,3 +1,4 @@
+import { SHIELD } from '../content/enemies';
 /**
  * Шаг симуляции (dt = 1/60). Порядок систем: ввод/оператор → волна/спавн → враги → оружие →
  * снаряды → мины → скрап и подборы → таймер волны.
@@ -149,6 +150,16 @@ function updateBullets(s: SimState, dt: number, ev: EventSink): void {
         if (e.dead || b.hit.includes(e.id)) continue;
         if (segDistance(b.px, b.py, b.x, b.y, e.x, e.y) < e.r + b.r) {
           b.hit.push(e.id);
+          // Щитоносец: пуля спереди (±60° от взгляда) гасится щитом и останавливается
+          if (e.type === 'shieldbearer') {
+            const bl = Math.hypot(b.vx, b.vy) || 1;
+            if (-(Math.cos(e.a) * b.vx + Math.sin(e.a) * b.vy) / bl > SHIELD.arc) {
+              damageEnemy(s, e, b.damage * SHIELD.mult, false, b.weapon, ev, false);
+              ev.push({ t: 'burst', x: b.x, y: b.y, color: '#7fb4ff', n: 3, force: 120 });
+              dead = true;
+              break;
+            }
+          }
           damageEnemy(s, e, b.damage, b.crit, b.weapon, ev);
           if (b.burnChance && chance(s.rng.combat, b.burnChance / 100)) {
             e.burn = 3;

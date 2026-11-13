@@ -1,7 +1,8 @@
+import { WEAPONS } from '../content/weapons';
 import { TAU, clamp } from '../core/math';
 import { chance, nextFloat, range } from '../core/rng';
 import { BONUS_POOL_SHARE, PLAYER_IFRAMES, enemyHpMult } from '../content/balance';
-import { ELITE, ENEMIES, isArmored, isBoss, type EnemyType } from '../content/enemies';
+import { ELITE, ENEMIES, isArmored, isBoss, type EnemyType, ARMOR_PLATE, THIEF } from '../content/enemies';
 import { operatorById } from '../content/operators';
 import { threatMods } from '../content/threat';
 import { PALETTE } from '../content/palette';
@@ -44,11 +45,18 @@ export function dropScrap(s: SimState, x: number, y: number, value: number): voi
  * Нанести урон врагу. weapon — id источника для статистики.
  * depth 0 — прямое попадание оружия (запускает on-hit/on-kill эффекты), 1 — урон от эффектов (не запускает).
  */
+/** Броненосец: полный урон проходит только от ближнего боя и взрывов. */
+function plateIgnores(weapon: string): boolean {
+  const w = WEAPONS.find((x) => x.id === weapon);
+  return !!w && (w.dmgClass === 'melee' || w.tags.includes('explosive'));
+}
+
 export function damageEnemy(s: SimState, e: Enemy, raw: number, crit: boolean, weapon: string, ev: EventSink, showNumber = true, depth = 0): void {
   if (e.dead) return;
   const armored = depth === 0 ? operatorById(s.operator).rule.armoredBonus ?? 0 : 0;
   const bonus = armored && isArmored(e.type, !!e.elite) ? 1 + armored / 100 : 1;
-  const dmg = (e.shielded ? raw * 0.6 : raw) * bonus;
+  const plate = e.type === 'armadillo' && !plateIgnores(weapon) ? ARMOR_PLATE.mult : 1;
+  const dmg = (e.shielded ? raw * 0.6 : raw) * bonus * plate;
   e.hp -= dmg;
   e.hit = 0.06;
   s.stats.damageByWeapon[weapon] = (s.stats.damageByWeapon[weapon] ?? 0) + Math.min(dmg, dmg + e.hp);
@@ -90,6 +98,8 @@ export function killEnemy(s: SimState, e: Enemy, ev: EventSink, depth = 0): void
   if (extra) dropScrap(s, e.x, e.y, extra);
   // Скрап
   const value = e.elite ? ELITE.scrap : def.scrap;
+  // Магнитчик отдаёт украденное с процентом
+  if (e.loot) dropScrap(s, e.x, e.y, Math.round(e.loot * THIEF.payback));
   if (chance(s.rng.loot, def.scrapChance * (isBreach(s.wave) && !boss ? BREACH_SCRAP : 1))) {
     if (boss) for (let i = 0; i < 12; i++) dropScrap(s, e.x, e.y, Math.ceil(value / 12));
     else dropScrap(s, e.x, e.y, value);

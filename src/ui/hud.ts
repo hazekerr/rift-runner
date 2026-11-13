@@ -3,7 +3,7 @@ import { RUN_WAVES, xpToNext } from '../content/balance';
 import { MAX_WEAPONS, weaponById } from '../content/weapons';
 import { RARITY_PIPS } from '../content/levelups';
 import { t } from '../i18n';
-import { isBoss } from '../content/enemies';
+import { ENEMIES, isBoss } from '../content/enemies';
 import { dashCap, dashCooldown, maxHpOf, type SimState } from '../sim/state';
 import { $, DirtyStyle, DirtyText, h } from './dom';
 
@@ -86,7 +86,7 @@ export class Hud {
       $('bossbar').classList.toggle('hidden', !boss);
     }
     if (boss) {
-      this.bossName.set(t(boss.type === 'heart' ? 'hud.bossFinal' : 'hud.boss'));
+      this.bossName.set(boss.type === 'heart' ? t('hud.bossFinal') : boss.type === 'boss' ? t('hud.boss') : t(ENEMIES[boss.type].name).toUpperCase());
       this.bossFill.set(`${Math.max(0, (boss.hp / boss.maxHp) * 100)}%`);
     }
   }

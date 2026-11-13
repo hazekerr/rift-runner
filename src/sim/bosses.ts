@@ -12,17 +12,20 @@ import type { Enemy, SimState, Telegraph } from './state';
 import { flow, move } from './world';
 import { threatMods } from '../content/threat';
 
-type Pattern = 'volley' | 'fan' | 'charge' | 'spiral' | 'ringGap' | 'lasers' | 'summon' | 'slam';
+type Pattern = 'volley' | 'fan' | 'charge' | 'spiral' | 'ringGap' | 'lasers' | 'summon' | 'slam' | 'cross';
 
-const GUARDIAN: readonly Pattern[] = ['volley', 'fan', 'charge'];
+// 2.0: Страж получил удар по площади, Сердце — вращающийся крест лазеров; мини-боссы на 5 и 15
+const GUARDIAN: readonly Pattern[] = ['volley', 'fan', 'charge', 'slam'];
+const CRUSHER: readonly Pattern[] = ['charge', 'ringGap', 'charge', 'fan'];
+const BROOD: readonly Pattern[] = ['summon', 'spiral', 'slam', 'ringGap'];
 const HEART_BY_PHASE: readonly (readonly Pattern[])[] = [
   ['spiral', 'ringGap'],
-  ['spiral', 'lasers', 'ringGap', 'summon'],
-  ['lasers', 'slam', 'spiral', 'summon', 'ringGap', 'slam'],
+  ['spiral', 'lasers', 'ringGap', 'summon', 'cross'],
+  ['lasers', 'slam', 'cross', 'spiral', 'summon', 'ringGap', 'slam'],
 ];
 /** Длительность телеграфа: тяжёлые атаки дольше (скилл game-feel: 0.3–0.5 / 0.8–1.2 с). */
-const WINDUP: Record<Pattern, number> = { volley: 0.5, fan: 0.45, charge: 0.85, spiral: 0.5, ringGap: 0.6, lasers: 1.0, summon: 0.4, slam: 1.0 };
-const EXEC: Record<Pattern, number> = { volley: 0.1, fan: 0.1, charge: 0.55, spiral: 2.4, ringGap: 0.6, lasers: 0.25, summon: 0.1, slam: 0.15 };
+const WINDUP: Record<Pattern, number> = { volley: 0.5, fan: 0.45, charge: 0.85, spiral: 0.5, ringGap: 0.6, lasers: 1.0, summon: 0.4, slam: 1.0, cross: 1.1 };
+const EXEC: Record<Pattern, number> = { volley: 0.1, fan: 0.1, charge: 0.55, spiral: 2.4, ringGap: 0.6, lasers: 0.25, summon: 0.1, slam: 0.15, cross: 0.25 };
 /** Геометрия, общая для телеграфа и исполнения (рисуется то же, что стреляет). */
 export const FAN_SPREAD = 0.25;
 export const VOLLEY_SPREAD = 0.18;
@@ -34,7 +37,8 @@ export function heartPhase(e: Enemy): number {
 }
 
 function patternList(e: Enemy): readonly Pattern[] {
-  return e.type === 'heart' ? HEART_BY_PHASE[heartPhase(e) - 1]! : GUARDIAN;
+  if (e.type === 'heart') return HEART_BY_PHASE[heartPhase(e) - 1]!;
+  return e.type === 'crusher' ? CRUSHER : e.type === 'brood' ? BROOD : GUARDIAN;
 }
 
 function shoot(s: SimState, e: Enemy, angle: number, speed: number, dmg: number): void {
@@ -76,6 +80,10 @@ function startTelegraph(s: SimState, e: Enemy, p: Pattern, k: number, aimA: numb
     case 'lasers':
       e.tele = tele('lines', e.x, e.y, w, { a: aimA, spread: 0.7, count: 3, len: 1100, r: 14 });
       break;
+    case 'cross':
+      // крест из 4 лазеров, повёрнутый на 45° от оператора: стоять на линии к боссу безопасно, по диагоналям — нет
+      e.tele = tele('lines', e.x, e.y, w, { a: aimA + Math.PI / 4, spread: Math.PI / 2, count: 4, len: 1100, r: 14 });
+      break;
     case 'slam':
       e.tele = tele('circle', s.p.x, s.p.y, w, { r: 130 });
       break;
@@ -109,6 +117,7 @@ function execute(s: SimState, e: Enemy, p: Pattern, ev: EventSink): void {
       break;
     }
     case 'lasers':
+    case 'cross':
       if (tl) {
         for (let i = 0; i < tl.count; i++) {
           const a = tl.a + (i - (tl.count - 1) / 2) * tl.spread;
@@ -149,7 +158,7 @@ function bossMove(s: SimState, e: Enemy, dt: number, factor: number): void {
   const dx = p.x - e.x;
   const dy = p.y - e.y;
   const d = Math.hypot(dx, dy) || 1;
-  const want = e.type === 'heart' ? 320 : 120;
+  const want = e.type === 'heart' || e.type === 'brood' ? 320 : 120;
   const sp = e.speed * factor * (s.overtime ? 1.3 : 1) * (e.slow > 0 ? 1 - e.slowPct / 100 : 1);
   // Без прямой видимости — обход по полю потоков (иначе босс застревает за стеной и бой не кончается)
   const los = !s.obstacles.some((o) => segRect(e.x, e.y, p.x, p.y, o, e.r * 0.5));
@@ -194,8 +203,8 @@ export function updateBoss(s: SimState, e: Enemy, dt: number, ev: EventSink): vo
       startTelegraph(s, e, list[k]!, k, a, ev);
     }
   } else if (e.ai < 20) {
-    if (e.type === 'heart') bossMove(s, e, dt, 0.4);
-    if (e.type === 'boss' && list[e.ai - 10] !== 'charge' && e.tele) { e.tele.x = e.x; e.tele.y = e.y; }
+    if (e.type === 'heart' || e.type === 'brood') bossMove(s, e, dt, 0.4);
+    if (e.type !== 'heart' && list[e.ai - 10] !== 'charge' && list[e.ai - 10] !== 'slam' && e.tele) { e.tele.x = e.x; e.tele.y = e.y; }
     if (e.aiT <= 0) {
       const k = e.ai - 10;
       const pat = list[k] ?? list[0]!;
@@ -206,12 +215,12 @@ export function updateBoss(s: SimState, e: Enemy, dt: number, ev: EventSink): vo
   } else {
     const k = e.ai - 20;
     const pat = list[k] ?? list[0]!;
-    if (pat === 'charge' && e.type === 'boss') {
+    if (pat === 'charge' && e.type !== 'heart') {
       const vx = e.tele ? Math.cos(e.tele.a) : 0;
       const vy = e.tele ? Math.sin(e.tele.a) : 0;
       move(s, e, vx * CHARGE_SPEED * dt, vy * CHARGE_SPEED * dt);
     }
-    if (e.type === 'heart') bossMove(s, e, dt, 0.4);
+    if (e.type === 'heart' || e.type === 'brood') bossMove(s, e, dt, 0.4);
     if (pat === 'spiral') {
       // 4 потока, поворачиваются; выстрел каждые ~0.12 с
       if (Math.floor((e.aiT + dt) / 0.12) !== Math.floor(e.aiT / 0.12)) {

@@ -23,6 +23,15 @@ export const WAVE_TABLE: readonly WaveRow[] = [
   { type: 'tank', from: 6, w0: 0.6, perWave: 0.2, max: 2.5 },
   { type: 'miner', from: 7, w0: 0.6, perWave: 0.15, max: 2 },
   { type: 'healer', from: 8, w0: 0.4, perWave: 0.1, max: 1.2 },
+  // 2.0: новые типы — сначала по одному (малый вес), к поздним волнам массово
+  { type: 'bomber', from: 4, w0: 0.6, perWave: 0.25, max: 2.5 },
+  { type: 'shieldbearer', from: 6, w0: 0.5, perWave: 0.2, max: 2 },
+  { type: 'leaper', from: 8, w0: 0.5, perWave: 0.2, max: 2 },
+  { type: 'sniper', from: 9, w0: 0.4, perWave: 0.15, max: 1.5 },
+  { type: 'thief', from: 11, w0: 0.5, perWave: 0.1, max: 1.2 },
+  { type: 'hive', from: 12, w0: 0.3, perWave: 0.08, max: 0.8 },
+  { type: 'armadillo', from: 13, w0: 0.4, perWave: 0.15, max: 1.8 },
+  { type: 'phantom', from: 15, w0: 0.5, perWave: 0.15, max: 1.5 },
 ];
 
 export function waveWeights(w: number): Array<{ row: WaveRow; weight: number }> {
