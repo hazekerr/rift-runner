@@ -497,12 +497,15 @@ export class Renderer {
       if (e.ai === 1 || (e.type === 'leaper' && e.ai === 2)) this.drawEnemyTele(e, ex, ey);
       if (e.elite) {
         // радиус ауры — тонкое кольцо (заливка R150 у сотни элит после босса съедала кадр)
-        ctx.globalAlpha = 0.28;
+        // в толпе (25% элит после босса) кольца сливались в шум: тише и пунктиром
+        ctx.globalAlpha = crowd ? 0.1 : 0.18;
         ctx.strokeStyle = AURA_COLOR[e.elite];
         ctx.lineWidth = 1;
+        ctx.setLineDash([4, 8]);
         ctx.beginPath();
         ctx.arc(ex, ey, ELITE.auraRange, 0, TAU);
         ctx.stroke();
+        ctx.setLineDash([]);
         ctx.globalAlpha = 1;
       }
       const spr = this.enemySprite(e.type);

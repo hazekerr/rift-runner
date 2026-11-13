@@ -1,6 +1,6 @@
 # DESIGN: правила игры и формулы
 
-Целевые формулы и стартовые числа: `docs/research/SUMMARY.md`, в коде — `src/content/balance.ts`. Этот файл описывает то, что **реализовано сейчас** (этап 6). Таблица кривых HP/урона/цен и прогоны бота — `docs/balance-report.md` (`npm run balance`), производительность — `docs/perf-report.md`.
+Целевые формулы и стартовые числа: `docs/research/SUMMARY.md`, в коде — `src/content/balance.ts`. Этот файл описывает то, что **реализовано сейчас** (обновление 2.0). Таблица кривых HP/урона/цен и прогоны бота — `docs/balance-report.md` (`npm run balance`), производительность — `docs/perf-report.md`.
 
 ## Забег
 
