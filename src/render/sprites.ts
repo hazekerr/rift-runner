@@ -48,6 +48,26 @@ export class SpriteBank {
     return s;
   }
 
+  /**
+   * Спрайт, заранее повёрнутый на bin из bins: рисуется без матрицы поворота.
+   * Программный растр (телефоны без GPU-растра, headless) поворачивает картинку дорого, а при 600 врагах это весь кадр.
+   */
+  rotated(key: string, base: Sprite, bin: number, bins: number): Sprite {
+    const k = `${key}@${bin}`;
+    const hit = this.cache.get(k);
+    if (hit) return hit;
+    const c = document.createElement('canvas');
+    c.width = base.canvas.width;
+    c.height = base.canvas.height;
+    const g = c.getContext('2d')!;
+    g.translate(c.width / 2, c.height / 2);
+    g.rotate((bin / bins) * Math.PI * 2);
+    g.drawImage(base.canvas, -c.width / 2, -c.height / 2);
+    const s = { canvas: c, half: base.half };
+    this.cache.set(k, s);
+    return s;
+  }
+
   /** Белый силуэт спрайта — для вспышки попадания. */
   white(key: string, base: Sprite): Sprite {
     const k = `${key}:white`;

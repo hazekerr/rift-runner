@@ -1,6 +1,6 @@
 import { TAU, clamp, lerp } from '../core/math';
 import { ARENA_CENTER, WORLD, makeArena, type ObstacleDef } from '../content/arena';
-import { AURA_COLOR, AURA_GLYPH, ENEMIES, MINE, RUNNER_DASH } from '../content/enemies';
+import { AURA_COLOR, AURA_GLYPH, ELITE, ENEMIES, MINE, RUNNER_DASH } from '../content/enemies';
 import { PALETTE } from '../content/palette';
 import { weaponById } from '../content/weapons';
 import { isBoss } from '../content/enemies';
@@ -23,6 +23,9 @@ export interface ViewState {
 }
 
 const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
+
+/** Число заранее повёрнутых направлений спрайта врага. */
+const ROT_BINS = 24;
 
 export class Renderer {
   readonly ctx: CanvasRenderingContext2D;
@@ -452,19 +455,30 @@ export class Renderer {
 
   private drawEnemies(s: SimState, alpha: number): void {
     const ctx = this.ctx;
-    // все тени одним путём
-    ctx.fillStyle = '#05090c77';
-    ctx.beginPath();
-    for (const e of s.enemies) {
-      const ex = lerp(e.px, e.x, alpha) + 4;
-      const ey = lerp(e.py, e.y, alpha) + 8;
-      ctx.moveTo(ex + e.r * 1.1, ey);
-      ctx.ellipse(ex, ey, e.r * 1.1, e.r * 0.8, 0, 0, TAU);
+    // Отсечение за экраном (арена больше вьюпорта) и LOD для толпы (план 2.0: до 600 врагов)
+    const x0 = -this.ox - 160;
+    const y0 = -this.oy - 160;
+    const x1 = -this.ox + this.W + 160;
+    const y1 = -this.oy + this.H + 160;
+    const crowd = s.enemies.length > 250;
+    if (!crowd) {
+      // все тени одним путём
+      ctx.fillStyle = '#05090c77';
+      ctx.beginPath();
+      for (const e of s.enemies) {
+        const ex = lerp(e.px, e.x, alpha) + 4;
+        const ey = lerp(e.py, e.y, alpha) + 8;
+        if (ex < x0 || ex > x1 || ey < y0 || ey > y1) continue;
+        ctx.moveTo(ex + e.r * 1.1, ey);
+        ctx.ellipse(ex, ey, e.r * 1.1, e.r * 0.8, 0, 0, TAU);
+      }
+      ctx.fill();
     }
-    ctx.fill();
+    const D = this.DPR;
     for (const e of s.enemies) {
       const ex = lerp(e.px, e.x, alpha);
       const ey = lerp(e.py, e.y, alpha);
+      if (ex < x0 || ex > x1 || ey < y0 || ey > y1) continue;
       const def = ENEMIES[e.type];
       const color = def.color;
       // телеграф рывка раннера
@@ -478,52 +492,64 @@ export class Renderer {
         ctx.stroke();
       }
       if (e.elite) {
-        ctx.globalAlpha = 0.12;
-        ctx.fillStyle = AURA_COLOR[e.elite];
+        // радиус ауры — тонкое кольцо (заливка R150 у сотни элит после босса съедала кадр)
+        ctx.globalAlpha = 0.28;
+        ctx.strokeStyle = AURA_COLOR[e.elite];
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(ex, ey, 150, 0, TAU);
-        ctx.fill();
+        ctx.arc(ex, ey, ELITE.auraRange, 0, TAU);
+        ctx.stroke();
         ctx.globalAlpha = 1;
       }
-      // поворот без save/restore: setTransform дешевле при сотнях врагов
-      const cos = Math.cos(e.a);
-      const sin = Math.sin(e.a);
-      const D = this.DPR;
-      ctx.save();
-      ctx.setTransform(cos * D, sin * D, -sin * D, cos * D, (ex + this.ox) * D, (ey + this.oy) * D);
-      // спрайт «детальный неон»: масштаб по фактическому радиусу (элиты крупнее)
       const spr = this.enemySprite(e.type);
       const k = e.r / def.r;
       const h = spr.half * k;
-      ctx.drawImage(spr.canvas, -h, -h, h * 2, h * 2);
-      if (e.hit > 0 && this.flashes) {
-        ctx.globalAlpha = Math.min(1, e.hit / 0.06) * 0.85;
-        ctx.drawImage(this.sprites.white(`e:${e.type}`, spr).canvas, -h, -h, h * 2, h * 2);
-        ctx.globalAlpha = 1;
-      }
-      if (e.elite) {
-        ctx.strokeStyle = AURA_COLOR[e.elite];
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, e.r + 5, 0, TAU);
-        ctx.stroke();
-      }
-      if (isBoss(e.type)) {
+      if (!isBoss(e.type)) {
+        // обычные враги: заранее повёрнутый спрайт (24 направления), без матрицы
+        let bin = Math.round((e.a / TAU) * ROT_BINS) % ROT_BINS;
+        if (bin < 0) bin += ROT_BINS;
+        const key = `e:${e.type}`;
+        ctx.drawImage(this.sprites.rotated(key, spr, bin, ROT_BINS).canvas, ex - h, ey - h, h * 2, h * 2);
+        if (e.hit > 0 && this.flashes) {
+          ctx.globalAlpha = Math.min(1, e.hit / 0.06) * 0.85;
+          const w = this.sprites.white(key, spr);
+          ctx.drawImage(this.sprites.rotated(`${key}:white`, w, bin, ROT_BINS).canvas, ex - h, ey - h, h * 2, h * 2);
+          ctx.globalAlpha = 1;
+        }
+        if (e.elite) {
+          ctx.strokeStyle = AURA_COLOR[e.elite];
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(ex, ey, e.r + 5, 0, TAU);
+          ctx.stroke();
+        }
+      } else {
+        // боссы (их 1–2): поворот матрицей, плюс кольца фаз
+        const cos = Math.cos(e.a);
+        const sin = Math.sin(e.a);
+        ctx.setTransform(cos * D, sin * D, -sin * D, cos * D, (ex + this.ox) * D, (ey + this.oy) * D);
+        ctx.drawImage(spr.canvas, -h, -h, h * 2, h * 2);
+        if (e.hit > 0 && this.flashes) {
+          ctx.globalAlpha = Math.min(1, e.hit / 0.06) * 0.85;
+          ctx.drawImage(this.sprites.white(`e:${e.type}`, spr).canvas, -h, -h, h * 2, h * 2);
+          ctx.globalAlpha = 1;
+        }
         ctx.strokeStyle = s.overtime ? '#ffffff' : '#ff8597';
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(0, 0, e.r + 8, e.phase, e.phase + Math.PI * 1.5);
         ctx.stroke();
         if (e.type === 'heart') {
           // пульсирующее ядро, число колец = фаза
           const ph = Math.max(1, e.vx);
-          for (let k = 0; k < ph; k++) {
+          for (let q = 0; q < ph; q++) {
             ctx.beginPath();
-            ctx.arc(0, 0, e.r * (0.45 + 0.12 * k) + Math.sin(e.phase * 6) * 2, 0, TAU);
+            ctx.arc(0, 0, e.r * (0.45 + 0.12 * q) + Math.sin(e.phase * 6) * 2, 0, TAU);
             ctx.stroke();
           }
         }
+        ctx.setTransform(D, 0, 0, D, this.ox * D, this.oy * D);
       }
-      ctx.restore();
       if (e.shielded) {
         ctx.strokeStyle = AURA_COLOR.shield;
         ctx.lineWidth = 1.5;

@@ -1,6 +1,6 @@
 import { WEAPONS, MAX_WEAPONS } from '../content/weapons';
 import { ENEMIES, type EnemyType } from '../content/enemies';
-import { RUN_WAVES } from '../content/balance';
+import { MAX_ALIVE, RUN_WAVES } from '../content/balance';
 import { t, type I18nKey } from '../i18n';
 import { spawnEnemyNow } from '../sim/combat';
 import type { EventSink } from '../sim/events';
@@ -90,7 +90,7 @@ export class DevPanel {
   /** Долить стресс-сцену до целевых чисел (вызывается каждый тик). */
   topUpStress(s: SimState): void {
     if (!this.stress) return;
-    for (let i = s.enemies.length; i < 300; i++) {
+    for (let i = s.enemies.length; i < MAX_ALIVE; i++) {
       const e = spawnEnemyNow(s, i % 4 ? 'drone' : 'gunner', 60 + (i * 37) % 1780, 60 + ((i * 53) % 1130), null);
       e.hp = e.maxHp = 1e9;
     }
