@@ -79,6 +79,10 @@ export const ru = {
   'touch.dash': 'РЫВОК',
   'touch.pulse': 'ИМПУЛЬС',
 
+  'toast.horde': 'ОРДА',
+  'toast.horde.sub': '{n} ВРАГОВ КОЛЬЦОМ. ПРОБИВАЙСЯ.',
+  'toast.breach.sub': 'РАЗЛОМ ОТКРЫТ. ИХ СТАНЕТ НАМНОГО БОЛЬШЕ.',
+  'toast.breach.sub2': 'РАЗЛОМ ОТКРЫТ · {s} СЕКУНД',
   'toast.wave': 'ВОЛНА {n}',
   'toast.wave.sub': 'ДВИГАЙСЯ. ЦЕЛЬСЯ. ВЫЖИВАЙ.',
   'toast.wave.sub2': '{s} СЕКУНД. ДЕРЖИСЬ.',
@@ -467,6 +471,6 @@ export const ru = {
   'dev.weapon': 'Выдать оружие',
   'dev.spawn': 'Спавн у курсора',
   'dev.elite': 'элитой',
-  'dev.stress': 'Стресс 300/1000',
+  'dev.stress': 'Стресс 600/1000',
   'dev.perf': 'сим {s} мс · рендер {r} мс · врагов {e} · пуль {b}',
 } as const;

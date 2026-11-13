@@ -174,6 +174,8 @@ export interface SimState {
   pendingLevels: number;
   /** Аптечек выпало с врагов в этой волне (кап kitCap). */
   kitsThisWave?: number;
+  /** Орда «Разлома» в этой волне уже была. */
+  hordeDone?: boolean;
   levelOffer: LevelOffer[];
   levelRerolls: number;
   shop: ShopState;

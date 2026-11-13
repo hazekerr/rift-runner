@@ -4,7 +4,8 @@
  */
 export const RUN_WAVES = 20;
 export const BOSS_WAVES: readonly number[] = [10, 20];
-export const MAX_ALIVE = 300;
+/** Кап живых врагов (план 2.0: 300 → 600, толпы после босса). */
+export const MAX_ALIVE = 600;
 export const SPAWN_QUIET_TAIL = 3; // секунд без спавна в конце волны
 /** Доля обычного спавна на босс-волнах (решение после баланс-прогона: 0.6 → 0.4, бой со Стражем — почти дуэль). */
 export const BOSS_WAVE_SPAWN = 0.4;
@@ -18,22 +19,35 @@ export function waveTime(w: number): number {
   return Math.round(20 + (40 * (w - 1)) / 19);
 }
 
+/**
+ * «Разлом открыт» (план 2.0, решение 1Б): после Стража (волны 11–19) спавн ×1.8, орда раз в волну,
+ * HP растёт быстрее (1.06 вместо 1.04 за волну после 10-й), урон +35%.
+ */
+export const BREACH_FROM = 11;
+export const BREACH_SPAWN = 1.8;
+export const isBreach = (w: number): boolean => w >= BREACH_FROM && w < RUN_WAVES;
+/** Орда: кольцо вокруг оператора на половине таймера. */
+export const hordeSize = (w: number): number => Math.min(80, 40 + 5 * (w - BREACH_FROM));
+export const HORDE_AT = 0.5;
+/** Доля скрапа с врагов в «Разломе»: врагов ×1.8, а доход — как раньше (иначе толпа кормит снежный ком). */
+export const BREACH_SCRAP = 0.55;
+
 export function spawnRate(w: number): number {
-  return 1.0 + 0.22 * (w - 1);
+  return (1.0 + 0.22 * (w - 1)) * (isBreach(w) ? BREACH_SPAWN : 1);
 }
 
 export function enemyHpMult(w: number): number {
-  const base = (1 + 0.3 * (w - 1)) * 1.04 ** Math.max(0, w - 10);
+  const base = (1 + 0.3 * (w - 1)) * 1.06 ** Math.max(0, w - 10);
   return w > RUN_WAVES ? base * 1.12 ** (w - RUN_WAVES) : base;
 }
 
 export function enemyDmgMult(w: number): number {
-  const base = 1 + 0.12 * (w - 1);
+  const base = (1 + 0.12 * (w - 1)) * (w > 10 ? 1.35 : 1);
   return w > RUN_WAVES ? base * 1.06 ** (w - RUN_WAVES) : base;
 }
 
 export function eliteChance(w: number): number {
-  return Math.max(0, Math.min(0.15, 0.02 * (w - 4)));
+  return Math.max(0, Math.min(w >= BREACH_FROM ? 0.25 : 0.15, 0.02 * (w - 4)));
 }
 
 export function xpToNext(level: number): number {

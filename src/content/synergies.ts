@@ -21,8 +21,8 @@ export const SYNERGY_THRESHOLDS = [3, 6] as const;
 export const SYNERGIES: Record<WeaponTag, readonly [SynergyTier, SynergyTier]> = {
   melee: [
     // ближний бой платит риском контакта: синергия даёт живучесть, а не только урон (план 2.0, этап 2)
-    { mods: [{ stat: 'meleeDmg', flat: 15 }, { stat: 'lifesteal', flat: 4 }, { stat: 'armor', flat: 2 }] },
-    { mods: [{ stat: 'meleeDmg', flat: 25 }, { stat: 'armor', flat: 5 }, { stat: 'maxHp', flat: 20 }] },
+    { mods: [{ stat: 'meleeDmg', flat: 15 }, { stat: 'lifesteal', flat: 3 }, { stat: 'armor', flat: 1 }] },
+    { mods: [{ stat: 'meleeDmg', flat: 20 }, { stat: 'armor', flat: 3 }, { stat: 'maxHp', flat: 10 }] },
   ],
   ballistic: [
     { mods: [{ stat: 'rangedDmg', flat: 12 }, { stat: 'range', flat: 40 }] },

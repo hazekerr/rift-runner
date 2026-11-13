@@ -13,9 +13,11 @@ describe('баланс: кривые совпадают с SUMMARY.md', () => {
   it('множители врагов', () => {
     expect(enemyHpMult(1)).toBe(1);
     expect(enemyHpMult(10)).toBeCloseTo(3.7);
-    expect(enemyHpMult(20)).toBeCloseTo(9.92, 1);
-    expect(enemyDmgMult(20)).toBeCloseTo(3.28);
+    // 2.0 «Разлом открыт»: после 10-й HP ×1.06 за волну, урон +35%, спавн на 11–19 ×1.8
+    expect(enemyHpMult(20)).toBeCloseTo(6.7 * 1.06 ** 10, 2);
+    expect(enemyDmgMult(20)).toBeCloseTo(3.28 * 1.35);
     expect(spawnRate(20)).toBeCloseTo(5.18);
+    expect(spawnRate(15)).toBeCloseTo(4.08 * 1.8);
   });
   it('опыт и реролл', () => {
     expect([1, 2, 3, 4].map(xpToNext)).toEqual([8, 20, 33, 49]);

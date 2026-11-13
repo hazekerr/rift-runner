@@ -1,7 +1,7 @@
 import { TAU } from '../core/math';
 import { chance, int, nextFloat, range } from '../core/rng';
 import {
-  BOSS_WAVES, BOSS_WAVE_SPAWN, BURST_AT, HARVEST_GROWTH, MAX_ALIVE, RUN_WAVES, SPAWN_QUIET_TAIL,
+  BOSS_WAVES, BOSS_WAVE_SPAWN, BREACH_FROM, BURST_AT, HORDE_AT, hordeSize, isBreach, HARVEST_GROWTH, MAX_ALIVE, RUN_WAVES, SPAWN_QUIET_TAIL,
   eliteChance, enemyDmgMult, rarityWeights, rerollCost, spawnRate, waveTime, xpToNext,
 } from '../content/balance';
 import { ARENA_CENTER, WORLD } from '../content/arena';
@@ -27,6 +27,7 @@ export function startWave(s: SimState, ev: EventSink): void {
   s.waveLeft = s.waveDuration;
   s.spawnAcc = 0;
   s.burstsDone = 0;
+  s.hordeDone = false;
   s.kitsThisWave = 0;
   s.overtime = false;
   s.levelRerolls = 0;
@@ -51,7 +52,8 @@ export function startWave(s: SimState, ev: EventSink): void {
     ev.push({ t: 'toast', key: s.wave >= RUN_WAVES ? 'toast.final' : 'toast.boss', sub: 'toast.boss.sub', params: { n: s.wave }, duration: 3 });
     ev.push({ t: 'sfx', id: 'bossSpawn' });
   } else {
-    ev.push({ t: 'toast', key: 'toast.wave', sub: 'toast.wave.sub2', params: { n: String(s.wave).padStart(2, '0'), s: s.waveDuration }, duration: 2.2 });
+    const breach = isBreach(s.wave);
+    ev.push({ t: 'toast', key: 'toast.wave', sub: breach ? (s.wave === BREACH_FROM ? 'toast.breach.sub' : 'toast.breach.sub2') : 'toast.wave.sub2', params: { n: String(s.wave).padStart(2, '0'), s: s.waveDuration }, duration: breach && s.wave === BREACH_FROM ? 3 : 2.2 });
     ev.push({ t: 'sfx', id: 'waveStart' });
   }
 }
@@ -108,6 +110,28 @@ function spawnOne(s: SimState): void {
   }
 }
 
+/** Орда «Разлома»: плотное двойное кольцо вокруг оператора (телеграф — метки спавна 0.85 с). */
+function horde(s: SimState, ev: EventSink): void {
+  const n = hordeSize(s.wave);
+  const base = range(s.rng.spawn, 0, TAU);
+  let placed = 0;
+  for (let i = 0; i < n && alive(s) < MAX_ALIVE; i++) {
+    const ring = i % 2;
+    const a = base + (i / n) * TAU + ring * 0.08;
+    const rr = 500 + ring * 70;
+    const x = s.p.x + Math.cos(a) * rr;
+    const y = s.p.y + Math.sin(a) * rr;
+    if (x < 50 || y < 50 || x > WORLD.w - 50 || y > WORLD.h - 50 || !freeSpot(s, x, y, 16)) continue;
+    const roll = nextFloat(s.rng.spawn);
+    queue(s, roll < 0.45 ? 'swarm' : roll < 0.8 ? 'drone' : 'runner', x, y, null);
+    placed++;
+  }
+  if (placed) {
+    ev.push({ t: 'toast', key: 'toast.horde', sub: 'toast.horde.sub', params: { n: placed }, duration: 2 });
+    ev.push({ t: 'sfx', id: 'teleWarn' });
+  }
+}
+
 /** Всплеск: кольцо врагов вокруг оператора. */
 function burst(s: SimState): void {
   const n = Math.round(spawnRate(s.wave) * 4);
@@ -131,6 +155,7 @@ export function updateWave(s: SimState, dt: number, ev: EventSink): void {
       while (s.spawnAcc >= 1) { s.spawnAcc -= 1; spawnOne(s); }
       const progress = 1 - s.waveLeft / s.waveDuration;
       if (s.burstsDone < BURST_AT.length && progress >= BURST_AT[s.burstsDone]!) { s.burstsDone++; burst(s); }
+      if (isBreach(s.wave) && !s.hordeDone && progress >= HORDE_AT) { s.hordeDone = true; horde(s, ev); }
     }
   }
   for (let i = s.spawns.length - 1; i >= 0; i--) {

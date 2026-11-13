@@ -11,7 +11,7 @@ import type { EventSink } from './events';
 import { armorMult, dodgeChance } from './stats';
 import { healPlayer, maxHpOf, type Enemy, type SimState, type WeaponInst } from './state';
 import { absorbHit, onHit, onHurt, onKill } from './effects';
-import { KIT, TIER_MULT, kitCap } from '../content/balance';
+import { BREACH_SCRAP, KIT, TIER_MULT, isBreach, kitCap } from '../content/balance';
 
 const comboMult = (combo: number): number => Math.min(5, 1 + Math.floor(combo / 6));
 const MAX_SCRAP_ENTITIES = 700;
@@ -55,11 +55,11 @@ export function damageEnemy(s: SimState, e: Enemy, raw: number, crit: boolean, w
   if (showNumber) {
     ev.push({ t: 'floater', x: e.x + range(s.rng.combat, -8, 8), y: e.y - e.r - 6, key: crit ? 'float.crit' : 'float.dmg', n: Math.round(dmg), color: crit ? '#ffd166' : '#eef3ed', big: crit });
   }
-  // Вампиризм: шанс +1 HP за попадание, ICD 0.1 с
+  // Вампиризм: шанс +1 HP за попадание, ICD 0.25 с (2.0: было 0.1 — сотни попаданий в толпе давали полный отхил)
   const p = s.p;
   if (p.stats.lifesteal > 0 && p.lifestealCd <= 0 && chance(s.rng.combat, Math.min(100, p.stats.lifesteal) / 100)) {
     healPlayer(s, 1, 'lifesteal');
-    p.lifestealCd = 0.1;
+    p.lifestealCd = 0.25;
   }
   if (depth === 0 && e.hp > 0) onHit(s, e, dmg, crit, ev, damageEnemy);
   if (e.hp <= 0) killEnemy(s, e, ev, depth);
@@ -90,7 +90,7 @@ export function killEnemy(s: SimState, e: Enemy, ev: EventSink, depth = 0): void
   if (extra) dropScrap(s, e.x, e.y, extra);
   // Скрап
   const value = e.elite ? ELITE.scrap : def.scrap;
-  if (chance(s.rng.loot, def.scrapChance)) {
+  if (chance(s.rng.loot, def.scrapChance * (isBreach(s.wave) && !boss ? BREACH_SCRAP : 1))) {
     if (boss) for (let i = 0; i < 12; i++) dropScrap(s, e.x, e.y, Math.ceil(value / 12));
     else dropScrap(s, e.x, e.y, value);
   }

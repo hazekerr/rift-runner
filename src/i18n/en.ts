@@ -80,6 +80,10 @@ export const en: Record<I18nKey, string> = {
   'touch.dash': 'DASH',
   'touch.pulse': 'PULSE',
 
+  'toast.horde': 'HORDE',
+  'toast.horde.sub': '{n} ENEMIES IN A RING. BREAK THROUGH.',
+  'toast.breach.sub': 'THE RIFT IS OPEN. MANY MORE ARE COMING.',
+  'toast.breach.sub2': 'RIFT OPEN · {s} SECONDS',
   'toast.wave': 'WAVE {n}',
   'toast.wave.sub': 'MOVE. AIM. SURVIVE.',
   'toast.wave.sub2': '{s} SECONDS. HOLD ON.',
@@ -466,6 +470,6 @@ export const en: Record<I18nKey, string> = {
   'dev.weapon': 'Give weapon',
   'dev.spawn': 'Spawn at cursor',
   'dev.elite': 'as elite',
-  'dev.stress': 'Stress 300/1000',
+  'dev.stress': 'Stress 600/1000',
   'dev.perf': 'sim {s} ms · render {r} ms · enemies {e} · bullets {b}',
 };
