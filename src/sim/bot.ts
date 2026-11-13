@@ -6,31 +6,58 @@
  */
 import { ARENA_CENTER } from '../content/arena';
 import type { StatId } from '../content/stats';
-import { MAX_WEAPONS } from '../content/weapons';
+import { MAX_WEAPONS, weaponById } from '../content/weapons';
+import { weaponRange } from './weapons';
 import type { EventSink } from './events';
 import { emptyInput, type TickInput } from './input';
 import { buyOffer, canTakeWeapon, currentReroll, mergePartner, mergeWeapon, rerollShop } from './shop';
 import type { SimState } from './state';
 import { chooseLevel, leaveShop } from './waves';
 
+/** Стиль бота: «ближний», если хотя бы половина оружия — ближнего боя (иначе ближний бой не измерить честно). */
+export function botMelee(s: SimState): boolean {
+  const n = s.p.weapons.length;
+  return n > 0 && s.p.weapons.filter((w) => weaponById(w.id).dmgClass === 'melee').length * 2 >= n;
+}
+
+/** Дистанция удара ближнего оружия бота (минимум по арсеналу). */
+function meleeReach(s: SimState): number {
+  let r = Infinity;
+  for (const w of s.p.weapons) {
+    const def = weaponById(w.id);
+    if (def.dmgClass === 'melee') r = Math.min(r, weaponRange(s, def));
+  }
+  return Number.isFinite(r) ? r : 80;
+}
+
 export function botInput(s: SimState): TickInput {
   const p = s.p;
   const inp = emptyInput();
+  const melee = botMelee(s);
+  // дальний стиль держит дистанцию 280, ближний подпускает до касания и сам идёт к цели
+  const keep = melee ? 34 : 280;
   let vx = 0;
   let vy = 0;
   let nearCount = 0;
   let closest = Infinity;
+  let target: { x: number; y: number; r: number } | null = null;
+  let td = Infinity;
   for (const e of s.enemies) {
     const dx = p.x - e.x;
     const dy = p.y - e.y;
     const d = Math.hypot(dx, dy) || 1;
-    if (d < 280) {
-      const w = (280 - d) / 280;
+    if (d < 280) nearCount++;
+    if (d - e.r < keep) {
+      const w = (keep - (d - e.r)) / keep;
       vx += (dx / d) * w * w * 3;
       vy += (dy / d) * w * w * 3;
-      nearCount++;
     }
+    if (d < td) { td = d; target = e; }
     closest = Math.min(closest, d - e.r);
+  }
+  if (melee && target && td - target.r > meleeReach(s) * 0.7) {
+    vx -= ((p.x - target.x) / td) * 1.5;
+    vy -= ((p.y - target.y) / td) * 1.5;
   }
   let bulletDanger = false;
   for (const b of s.bullets) {
@@ -77,7 +104,7 @@ export function botInput(s: SimState): TickInput {
   }
   const len = Math.hypot(vx, vy);
   if (len > 0.05) { inp.moveX = vx / len; inp.moveY = vy / len; }
-  inp.dash = closest < 26 || bulletDanger;
+  inp.dash = (!melee && closest < 26) || bulletDanger;
   inp.pulse = p.energy >= 100 && nearCount >= 10;
   return inp;
 }

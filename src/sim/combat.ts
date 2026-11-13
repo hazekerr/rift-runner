@@ -9,7 +9,7 @@ import { CRIT_MULT } from '../content/stats';
 import type { WeaponDef } from '../content/weapons';
 import type { EventSink } from './events';
 import { armorMult, dodgeChance } from './stats';
-import { maxHpOf, type Enemy, type SimState, type WeaponInst } from './state';
+import { healPlayer, maxHpOf, type Enemy, type SimState, type WeaponInst } from './state';
 import { absorbHit, onHit, onHurt, onKill } from './effects';
 import { TIER_MULT } from '../content/balance';
 
@@ -58,7 +58,7 @@ export function damageEnemy(s: SimState, e: Enemy, raw: number, crit: boolean, w
   // Вампиризм: шанс +1 HP за попадание, ICD 0.1 с
   const p = s.p;
   if (p.stats.lifesteal > 0 && p.lifestealCd <= 0 && chance(s.rng.combat, Math.min(100, p.stats.lifesteal) / 100)) {
-    p.hp = Math.min(maxHpOf(p), p.hp + 1);
+    healPlayer(s, 1, 'lifesteal');
     p.lifestealCd = 0.1;
   }
   if (depth === 0 && e.hp > 0) onHit(s, e, dmg, crit, ev, damageEnemy);

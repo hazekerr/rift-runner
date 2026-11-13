@@ -131,8 +131,12 @@ export interface LevelOffer {
   value: number;
 }
 
+export type HealSource = 'kit' | 'regen' | 'lifesteal' | 'module';
+
 export interface RunStats {
   kills: number;
+  /** Реально восстановленное HP по источникам (без перелечивания) — для баланс-отчёта. */
+  healBy?: Partial<Record<HealSource, number>>;
   damageByWeapon: Record<string, number>;
   damageTaken: number;
   killedBy: EnemyType | 'mine' | '';
@@ -195,6 +199,19 @@ export const dashCap = (p: Player): number => p.dashMaxCharges + p.fx.dashCharge
 export const dashCooldown = (p: Player): number => p.dashMax * (1 - p.fx.dashCdPct / 100);
 /** Радиус импульса. */
 export const pulseRadius = (p: Player): number => 340 * (1 + p.fx.pulseRPct / 100);
+
+/** Вылечить оператора; возвращает реально восстановленное HP и учитывает источник. */
+export function healPlayer(s: SimState, amount: number, src: HealSource): number {
+  const p = s.p;
+  const before = p.hp;
+  p.hp = Math.min(maxHpOf(p), p.hp + amount);
+  const got = p.hp - before;
+  if (got > 0) {
+    const hb = (s.stats.healBy ??= {});
+    hb[src] = (hb[src] ?? 0) + got;
+  }
+  return got;
+}
 
 export function createPlayer(operator: string): Player {
   const op = operatorById(operator);

@@ -60,3 +60,4 @@ export function rarityWeights(progress: number, luck: number): [number, number, 
 export const BONUS_POOL_SHARE = 0.5;
 export const HARVEST_GROWTH = 1.03;
 export const PLAYER_IFRAMES = 0.5;
+

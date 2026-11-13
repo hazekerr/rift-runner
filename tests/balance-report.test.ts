@@ -7,14 +7,37 @@ import { writeFileSync } from 'node:fs';
 import { DT } from '../src/core/loop';
 import { startRun, step } from '../src/sim/step';
 import type { SimEvent } from '../src/sim/events';
-import { botInput, botLevel, botShop } from '../src/sim/bot';
-import { maxHpOf, type SimState } from '../src/sim/state';
+import { botInput, botLevel, botMelee, botShop } from '../src/sim/bot';
+import { maxHpOf, refreshStats, type SimState } from '../src/sim/state';
+import { WEAPONS } from '../src/content/weapons';
 import { weaponDps } from '../src/ui/shop';
 import { enemyDmgMult, enemyHpMult, spawnRate, waveTime } from '../src/content/balance';
 import { modulePrice, weaponPrice, currentReroll } from '../src/sim/shop';
 
-interface WaveRow { wave: number; reqDps: number; botDps: number; hpEnd: number; maxHp: number; taken: number; kills: number; scrap: number; level: number; weapons: string; }
+interface WaveRow { wave: number; reqDps: number; botDps: number; hpEnd: number; maxHp: number; taken: number; kills: number; scrap: number; level: number; weapons: string; healKit: number; healOther: number; alive: number; }
 interface RunResult { seed: number; operator: string; reached: number; won: boolean; rows: WaveRow[]; killedBy: string; }
+
+const healKit = (s: SimState): number => s.stats.healBy?.kit ?? 0;
+const healOther = (s: SimState): number => Object.entries(s.stats.healBy ?? {}).reduce((a, [k, v]) => a + (k === 'kit' ? 0 : v ?? 0), 0);
+
+/** Реальный DPS оружия в бою: 4 копии тира II, бот своего стиля, 25 с волны, бессмертный оператор. */
+function weaponProbe(id: string, wave: number, seeds: readonly number[]): { dps: number; taken: number } {
+  let dmg = 0;
+  let taken = 0;
+  for (const seed of seeds) {
+    const ev: SimEvent[] = [];
+    const s = startRun(seed, ev);
+    s.wave = wave;
+    s.waveLeft = 30;
+    s.p.weapons = [0, 1, 2, 3].map((i) => ({ uid: 50 + i, id, tier: 2, cd: 0, aim: 0, flash: 0, x: s.p.x, y: s.p.y }));
+    refreshStats(s.p);
+    s.p.stats.maxHp = 1e6; s.p.hp = 1e6;
+    for (let t = 0; t < 60 * 25 && s.phase === 'play'; t++) { step(s, botInput(s), DT, ev); ev.length = 0; }
+    dmg += s.stats.damageByWeapon[id] ?? 0;
+    taken += s.stats.damageTaken;
+  }
+  return { dps: dmg / (25 * seeds.length), taken: taken / seeds.length };
+}
 
 function runBot(seed: number, operator: string, maxWave = 20): RunResult {
   const ev: SimEvent[] = [];
@@ -24,12 +47,16 @@ function runBot(seed: number, operator: string, maxWave = 20): RunResult {
   let spawnedHp = 0;
   let takenAt = 0;
   let killsAt = 0;
+  let healKitAt = 0;
+  let healOtherAt = 0;
+  let peakAlive = 0;
   let wave = s.wave;
   let guard = 0;
   while (guard++ < 60 * 60 * 30) {
     if (s.phase === 'play') {
       for (const e of s.enemies) if (e.id > seen) { spawnedHp += e.maxHp; seen = Math.max(seen, e.id); }
       step(s, botInput(s), DT, ev);
+      peakAlive = Math.max(peakAlive, s.enemies.length);
     }
     if (s.wave !== wave || s.phase !== 'play') {
       if (s.phase === 'levelup' || s.phase === 'shop' || s.phase === 'victory' || s.phase === 'over') {
@@ -38,8 +65,10 @@ function runBot(seed: number, operator: string, maxWave = 20): RunResult {
             wave, reqDps: spawnedHp / waveTime(wave), botDps: s.p.weapons.reduce((a, w) => a + weaponDps(s, w.id, w.tier), 0),
             hpEnd: Math.max(0, s.p.hp), maxHp: maxHpOf(s.p), taken: s.stats.damageTaken - takenAt, kills: s.stats.kills - killsAt,
             scrap: s.scrap, level: s.level, weapons: s.p.weapons.map((w) => `${w.id}${w.tier}`).join(' '),
+            healKit: healKit(s) - healKitAt, healOther: healOther(s) - healOtherAt, alive: peakAlive,
           });
           spawnedHp = 0; takenAt = s.stats.damageTaken; killsAt = s.stats.kills;
+          healKitAt = healKit(s); healOtherAt = healOther(s); peakAlive = 0;
         }
       }
       if (s.phase === 'over' || s.phase === 'victory') break;
@@ -61,6 +90,7 @@ describe.skipIf(!process.env.BALANCE_REPORT)('баланс-прогон', () => 
   it('бот: 6 сидов, оператор по умолчанию', () => {
     const seeds = [1, 2, 3, 4, 5, 6];
     const runs = seeds.map((sd) => runBot(sd, 'operator'));
+    const welder = [1, 2, 3].map((sd) => runBot(sd, 'welder'));
     const lines: string[] = [];
     lines.push('# Баланс-отчёт', '', '> Сгенерировано `npm run balance` (бот `src/sim/bot.ts`, настоящий сим). Бот слабее живого игрока — это нижняя граница проходимости.', '');
     lines.push('## Кривые (формулы `src/content/balance.ts`)', '', '| Волна | Таймер, с | Спавн/с | HP врагов × | Урон врагов × | Оружие I / II / III / IV | Модуль ст./ул./пр./ан. | Реролл |', '|---|---|---|---|---|---|---|---|');
@@ -69,11 +99,24 @@ describe.skipIf(!process.env.BALANCE_REPORT)('баланс-прогон', () => 
     }
     lines.push('', '## Прогоны бота', '', '| Сид | Дошёл до волны | Победа | Причина смерти |', '|---|---|---|---|');
     for (const r of runs) lines.push(`| ${r.seed} | ${r.reached} | ${r.won ? 'да' : 'нет'} | ${r.killedBy || '—'} |`);
-    lines.push('', '## Медианы по волнам', '', '| Волна | Требуемый DPS | DPS бота | HP в конце / макс | Получено урона | Убийств | Скрап после | Уровень | n |', '|---|---|---|---|---|---|---|---|---|');
+    lines.push('', '### Сварщик (только ближний бой, бот в стиле «ближний»)', '', '| Сид | Дошёл до волны | Победа | Причина смерти |', '|---|---|---|---|');
+    for (const r of welder) lines.push(`| ${r.seed} | ${r.reached} | ${r.won ? 'да' : 'нет'} | ${r.killedBy || '—'} |`);
+    lines.push('', '## Медианы по волнам', '', '| Волна | Требуемый DPS | DPS бота | HP в конце / макс | Получено урона | Лечение: аптечки / прочее | Пик живых | Убийств | Скрап после | Уровень | n |', '|---|---|---|---|---|---|---|---|---|---|---|');
     for (let w = 1; w <= 20; w++) {
       const rs = runs.map((r) => r.rows[w - 1]).filter((x): x is WaveRow => !!x);
       if (!rs.length) break;
-      lines.push(`| ${w} | ${Math.round(median(rs.map((x) => x.reqDps)))} | ${Math.round(median(rs.map((x) => x.botDps)))} | ${Math.round(median(rs.map((x) => x.hpEnd)))} / ${Math.round(median(rs.map((x) => x.maxHp)))} | ${Math.round(median(rs.map((x) => x.taken)))} | ${Math.round(median(rs.map((x) => x.kills)))} | ${Math.round(median(rs.map((x) => x.scrap)))} | ${median(rs.map((x) => x.level))} | ${rs.length} |`);
+      lines.push(`| ${w} | ${Math.round(median(rs.map((x) => x.reqDps)))} | ${Math.round(median(rs.map((x) => x.botDps)))} | ${Math.round(median(rs.map((x) => x.hpEnd)))} / ${Math.round(median(rs.map((x) => x.maxHp)))} | ${Math.round(median(rs.map((x) => x.taken)))} | ${Math.round(median(rs.map((x) => x.healKit)))} / ${Math.round(median(rs.map((x) => x.healOther)))} | ${Math.round(median(rs.map((x) => x.alive)))} | ${Math.round(median(rs.map((x) => x.kills)))} | ${Math.round(median(rs.map((x) => x.scrap)))} | ${median(rs.map((x) => x.level))} | ${rs.length} |`);
+    }
+    lines.push('', '## Реальный DPS оружия', '', '4 копии тира II, бот своего стиля (ближнее оружие — подходит вплотную), 25 с волны, 3 сида. Коридор: ±25% от медианы по всем оружиям.', '', '| Оружие | Класс | Стиль бота | DPS w5 | DPS w12 | w12 / медиана |', '|---|---|---|---|---|---|');
+    const probe = WEAPONS.map((d) => {
+      const tmp = startRun(1, []);
+      tmp.p.weapons = [{ uid: 1, id: d.id, tier: 2, cd: 0, aim: 0, flash: 0, x: 0, y: 0 }];
+      return { d, style: botMelee(tmp) ? 'ближний' : 'дальний', w5: weaponProbe(d.id, 5, [1, 2, 3]).dps, w12: weaponProbe(d.id, 12, [1, 2, 3]).dps };
+    });
+    const med12 = median(probe.map((x) => x.w12));
+    for (const x of probe) {
+      const k = x.w12 / med12;
+      lines.push(`| ${x.d.id} | ${x.d.dmgClass} | ${x.style} | ${Math.round(x.w5)} | ${Math.round(x.w12)} | ${k.toFixed(2)}${k < 0.75 || k > 1.25 ? ' ⚠' : ''} |`);
     }
     lines.push('', '## Пример сборки по волнам (сид 1)', '');
     for (const row of runs[0]!.rows) lines.push(`- w${row.wave}: ${row.weapons}`);

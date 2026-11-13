@@ -11,7 +11,7 @@ import { waveWeights } from '../content/waves';
 import { circleRect } from './collide';
 import { spawnEnemyNow, sweepScrap } from './combat';
 import type { EventSink } from './events';
-import { dashCap, maxHpOf, refreshStats, type SimState } from './state';
+import { dashCap, healPlayer, maxHpOf, refreshStats, type SimState } from './state';
 import { openShop } from './shop';
 import { operatorById } from '../content/operators';
 import { threatMods } from '../content/threat';
@@ -210,7 +210,7 @@ export function gainScrap(s: SimState, v: number, ev: EventSink, useBonus = true
   const every = s.p.fx.scrapHealEvery;
   if (every > 0 && s.phase === 'play') {
     s.p.scrapHealAcc += total;
-    while (s.p.scrapHealAcc >= every) { s.p.scrapHealAcc -= every; s.p.hp = Math.min(maxHpOf(s.p), s.p.hp + 1); }
+    while (s.p.scrapHealAcc >= every) { s.p.scrapHealAcc -= every; healPlayer(s, 1, 'module'); }
   }
   while (s.xp >= xpToNext(s.level)) {
     s.xp -= xpToNext(s.level);

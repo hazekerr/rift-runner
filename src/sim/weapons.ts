@@ -8,8 +8,9 @@ import { damageEnemy, rollWeaponDamage } from './combat';
 import type { EventSink } from './events';
 import type { TickInput } from './input';
 import { cooldownOf } from './stats';
-import type { SimState, WeaponInst } from './state';
-import { enemyHash, MAX_ENEMY_R, nearestEnemy } from './world';
+import type { Enemy, SimState, WeaponInst } from './state';
+import { isBoss } from '../content/enemies';
+import { enemyHash, MAX_ENEMY_R, move, nearestEnemy } from './world';
 
 const ORBIT_R = 34;
 
@@ -78,6 +79,14 @@ export function updateWeapons(s: SimState, inp: TickInput, dt: number, ev: Event
   }
 }
 
+/** Отбросить врага от точки удара (не боссов). */
+function knockBack(s: SimState, e: Enemy, fx: number, fy: number, px: number): void {
+  if (px <= 0 || e.dead || isBoss(e.type)) return;
+  const d = Math.hypot(e.x - fx, e.y - fy) || 1;
+  const k = e.type === 'tank' ? 0.4 : 1;
+  move(s, e, ((e.x - fx) / d) * px * k, ((e.y - fy) / d) * px * k);
+}
+
 function orbitHit(s: SimState, def: WeaponDef, inst: WeaponInst, ev: EventSink): void {
   let any = false;
   for (let k = 0; k < (def.blades ?? 2); k++) {
@@ -87,6 +96,7 @@ function orbitHit(s: SimState, def: WeaponDef, inst: WeaponInst, ev: EventSink):
       if (!e || e.dead || Math.hypot(e.x - b.x, e.y - b.y) > e.r + 16) return;
       const { dmg, crit } = rollWeaponDamage(s, def, inst);
       damageEnemy(s, e, dmg, crit, def.id, ev);
+      knockBack(s, e, b.x, b.y, def.knock ?? 0);
       any = true;
     });
   }
@@ -132,6 +142,7 @@ function fire(s: SimState, def: WeaponDef, inst: WeaponInst, rangeV: number, tar
         if (Math.abs(da) > arc && d > e.r) return;
         const { dmg, crit } = rollWeaponDamage(s, def, inst);
         damageEnemy(s, e, dmg, crit, def.id, ev);
+        knockBack(s, e, inst.x, inst.y, def.knock ?? 0);
       });
       ev.push({ t: 'swing', x: inst.x, y: inst.y, a, arc, r: rangeV, color: def.color });
       break;

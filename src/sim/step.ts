@@ -12,7 +12,7 @@ import { damageEnemy, hurtPlayer } from './combat';
 import { updateEnemies, updateMines } from './enemies';
 import type { EventSink } from './events';
 import type { TickInput } from './input';
-import { createRun, dashCap, dashCooldown, maxHpOf, pulseRadius, type SimState } from './state';
+import { createRun, dashCap, dashCooldown, healPlayer, maxHpOf, pulseRadius, type SimState } from './state';
 import { gainScrap, startWave, updateWave } from './waves';
 import { updateWeapons } from './weapons';
 import { onDash, tickEffects } from './effects';
@@ -93,7 +93,7 @@ function updatePlayer(s: SimState, inp: TickInput, dt: number, ev: EventSink): v
     if (p.regenAcc >= 1) {
       const add = Math.floor(p.regenAcc);
       p.regenAcc -= add;
-      p.hp = Math.min(maxHpOf(p), p.hp + add);
+      healPlayer(s, add, 'regen');
     }
   }
   let mx = inp.moveX;
@@ -278,7 +278,7 @@ function updateLoot(s: SimState, dt: number, ev: EventSink): void {
     if (d < 27) {
       if (item.type === 'heal') {
         const heal = Math.round(maxHpOf(p) * 0.2);
-        p.hp = Math.min(maxHpOf(p), p.hp + heal);
+        healPlayer(s, heal, 'kit');
         ev.push({ t: 'floater', x: p.x, y: p.y - 28, key: 'float.heal', n: heal, color: PALETTE.cyan });
       } else {
         p.energy = Math.min(100, p.energy + 22);

@@ -9,7 +9,7 @@ import { moduleById, type EffectDef } from '../content/modules';
 import { PALETTE } from '../content/palette';
 import { isBoss } from '../content/enemies';
 import type { EventSink } from './events';
-import { maxHpOf, type Enemy, type SimState } from './state';
+import { healPlayer, maxHpOf, type Enemy, type SimState } from './state';
 import { enemyHash, MAX_ENEMY_R, nearestEnemy } from './world';
 
 export interface FxAgg {
@@ -150,7 +150,7 @@ export function onKill(s: SimState, e: Enemy, ev: EventSink, dmgFn: DamageFn): n
     areaDamage(s, e.x, e.y, fx.killExplode.r, fx.killExplode.dmg * effectScale(s), 'm.explode', ev, dmgFn);
   }
   if (fx.energyOnKill) p.energy = Math.min(100, p.energy + fx.energyOnKill);
-  if (fx.killHeal.chance && chance(s.rng.combat, fx.killHeal.chance / 100)) p.hp = Math.min(maxHpOf(p), p.hp + fx.killHeal.amount);
+  if (fx.killHeal.chance && chance(s.rng.combat, fx.killHeal.chance / 100)) healPlayer(s, fx.killHeal.amount, 'module');
   if (fx.dashReset.chance && chance(s.rng.combat, fx.dashReset.chance / 100)) p.dashCd = Math.max(0, p.dashCd - fx.dashReset.sec);
   if (fx.scrapOnKill && chance(s.rng.loot, fx.scrapOnKill / 100)) extraScrap++;
   return extraScrap;
