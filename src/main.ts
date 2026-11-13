@@ -42,7 +42,8 @@ const input = new Input();
 const events: SimEvent[] = [];
 const view: ViewState = { crosshair: false, mouseX: 0, mouseY: 0, hitboxes: false, manual: false, flashes: true };
 const ambient = new Ambient();
-audio.onReady = (e) => ambient.start(e);
+// эмбиент запускается только если музыка включена (по умолчанию выключена — не тратим CPU на тишину)
+audio.onReady = (e) => { if (meta.settings.music > 0) ambient.start(e); };
 
 let app: AppState = 'menu';
 let sim: SimState | null = null;
@@ -57,6 +58,7 @@ function applySettings(st: Settings): void {
   setLang(st.lang);
   document.documentElement.lang = st.lang;
   audio.setVolumes(st.music, st.sfx);
+  if (st.music > 0 && audio.ctx) ambient.start(audio);
   fx.shakeScale = st.shake;
   fx.damageNumbers = st.numbers;
   view.flashes = st.flashes;

@@ -5,6 +5,7 @@ import { OPERATORS, type OperatorDef } from '../content/operators';
  * Мета-сохранение с версией схемы. Новая версия = новая ветка в migrate(), старые данные не теряются.
  * v1 (этап 1–3): рекорд и звук. v2 (этап 4): открытые операторы и статистика за все забеги.
  * v3 (этап 5): настройки и уровни Угрозы.
+ * v4 (отзыв v1.1): музыка по умолчанию выключена; у v3 старое значение по умолчанию 0.5 сбрасывается в 0.
  */
 export interface Lifetime {
   runs: number;
@@ -27,8 +28,8 @@ export interface Settings {
   quality: Quality;
 }
 
-export interface MetaV3 {
-  v: 3;
+export interface MetaV4 {
+  v: 4;
   best: number;
   muted: boolean;
   unlocked: string[];
@@ -39,11 +40,11 @@ export interface MetaV3 {
   lastThreat: number;
   settings: Settings;
 }
-export type Meta = MetaV3;
+export type Meta = MetaV4;
 
 export const META_KEY = `${PRODUCT.storagePrefix}-meta`;
 const LEGACY_BEST_KEY = 'rr-best';
-export const META_VERSION = 3;
+export const META_VERSION = 4;
 
 export interface KV {
   getItem(k: string): string | null;
@@ -51,9 +52,9 @@ export interface KV {
 }
 
 const emptyLife = (): Lifetime => ({ runs: 0, kills: 0, bestWave: 0, bestScrap: 0, guardianKills: 0, wins: 0 });
-export const defaultSettings = (): Settings => ({ music: 0.5, sfx: 0.8, shake: 1, flashes: true, numbers: true, lang: 'ru', quality: 'high' });
+export const defaultSettings = (): Settings => ({ music: 0, sfx: 0.8, shake: 1, flashes: true, numbers: true, lang: 'ru', quality: 'high' });
 export const defaultMeta = (): Meta => ({
-  v: 3, best: 0, muted: false, unlocked: ['operator'], lastOperator: 'operator', life: emptyLife(),
+  v: 4, best: 0, muted: false, unlocked: ['operator'], lastOperator: 'operator', life: emptyLife(),
   maxThreat: 0, lastThreat: 0, settings: defaultSettings(),
 });
 const unit = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d);
@@ -91,6 +92,9 @@ export function migrate(raw: unknown): Meta {
       lang: st.lang === 'en' ? 'en' : 'ru',
       quality: st.quality === 'low' ? 'low' : 'high',
     };
+    // v<4: 0.5 — бывшее значение по умолчанию, его не выбирали сознательно → выключить
+    const ver = typeof r.v === 'number' ? r.v : 1;
+    if (ver < 4 && st.music === 0.5) m.settings.music = 0;
   }
   return m;
 }

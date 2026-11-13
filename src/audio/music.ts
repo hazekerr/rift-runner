@@ -1,12 +1,13 @@
 import type { AudioEngine } from './engine';
 
 /**
- * Процедурный эмбиент: низкий пад из двух расстроенных пил + саб + шумовой «ветер разлома».
- * Интенсивность 0..1 (меню ≈0.1, магазин ≈0.2, бой — по числу врагов, босс — 1)
- * открывает фильтр, поднимает шум и добавляет пульс. Структура позволяет подменить на сэмпл-трек.
+ * Процедурный эмбиент — тихий фон, а не трек. Отзыв v1.1: прежний пад из расстроенных пил с квадратным
+ * пульсом 120 BPM утомлял за пару волн. Теперь: мягкий аккорд из синусов и треугольника (ля-минор,
+ * без биений), закрытый фильтр и едва слышный «ветер разлома». Интенсивность 0..1 лишь чуть открывает
+ * фильтр и поднимает ветер — без ритма и без резких частот. По умолчанию музыка выключена (настройки).
  */
 export class Ambient {
-  private nodes: { filter: BiquadFilterNode; noiseGain: GainNode; pulseGain: GainNode; lfo: OscillatorNode; pad: GainNode } | null = null;
+  private nodes: { filter: BiquadFilterNode; noiseGain: GainNode; pad: GainNode } | null = null;
   private intensity = 0;
 
   start(engine: AudioEngine): void {
@@ -14,12 +15,13 @@ export class Ambient {
     const out = engine.music;
     if (!ctx || !out || this.nodes) return;
     const pad = ctx.createGain();
-    pad.gain.value = 0.18;
+    pad.gain.value = 0.12;
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 320;
-    filter.Q.value = 4;
-    for (const [f, type, g] of [[55, 'sawtooth', 0.5], [55.4, 'sawtooth', 0.5], [27.5, 'sine', 0.9], [82.4, 'triangle', 0.2]] as const) {
+    filter.frequency.value = 420;
+    filter.Q.value = 0.5;
+    // A1, A2, C3, E3: мягкий минорный аккорд, без расстройки (нет биений)
+    for (const [f, type, g] of [[55, 'sine', 0.8], [110, 'triangle', 0.25], [130.81, 'sine', 0.18], [164.81, 'sine', 0.14]] as const) {
       const o = ctx.createOscillator();
       const og = ctx.createGain();
       o.type = type;
@@ -31,17 +33,17 @@ export class Ambient {
     }
     filter.connect(pad);
     pad.connect(out);
-    // медленное «дыхание» фильтра
+    // очень медленное «дыхание» громкости (≈ 14 с), без ритма
     const lfo = ctx.createOscillator();
     const lfoGain = ctx.createGain();
     lfo.frequency.value = 0.07;
-    lfoGain.gain.value = 120;
+    lfoGain.gain.value = 0.03;
     lfo.connect(lfoGain);
-    lfoGain.connect(filter.frequency);
+    lfoGain.connect(pad.gain);
     lfo.start();
-    // ветер разлома: зацикленный шум через полосовой фильтр
+    // ветер разлома: шум через низкий полосовой фильтр, на грани слышимости
     const noiseGain = ctx.createGain();
-    noiseGain.gain.value = 0.02;
+    noiseGain.gain.value = 0.008;
     const buf = engine.noise_;
     if (buf) {
       const src = ctx.createBufferSource();
@@ -49,23 +51,14 @@ export class Ambient {
       src.loop = true;
       const bp = ctx.createBiquadFilter();
       bp.type = 'bandpass';
-      bp.frequency.value = 700;
-      bp.Q.value = 0.8;
+      bp.frequency.value = 400;
+      bp.Q.value = 0.7;
       src.connect(bp);
       bp.connect(noiseGain);
       noiseGain.connect(out);
       src.start();
     }
-    // пульс: амплитудная модуляция пада в бою
-    const pulseGain = ctx.createGain();
-    pulseGain.gain.value = 0;
-    const pulse = ctx.createOscillator();
-    pulse.type = 'square';
-    pulse.frequency.value = 2; // 120 BPM
-    pulse.connect(pulseGain);
-    pulseGain.connect(pad.gain);
-    pulse.start();
-    this.nodes = { filter, noiseGain, pulseGain, lfo, pad };
+    this.nodes = { filter, noiseGain, pad };
   }
 
   /** Плавно сменить интенсивность (вызывать раз в кадр). */
@@ -77,8 +70,7 @@ export class Ambient {
     if (Math.abs(target - this.intensity) < 0.02) return;
     this.intensity = target;
     const t0 = ctx.currentTime;
-    n.filter.frequency.setTargetAtTime(300 + target * 1500, t0, 0.8);
-    n.noiseGain.gain.setTargetAtTime(0.015 + target * 0.05, t0, 0.8);
-    n.pulseGain.gain.setTargetAtTime(target > 0.45 ? (target - 0.45) * 0.12 : 0, t0, 0.8);
+    n.filter.frequency.setTargetAtTime(420 + target * 380, t0, 1.5);
+    n.noiseGain.gain.setTargetAtTime(0.008 + target * 0.012, t0, 1.5);
   }
 }
