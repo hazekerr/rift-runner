@@ -292,22 +292,29 @@ export class Renderer {
     }
   }
 
-  /** Телеграфы боссов: зона/линии видны до удара, заполняются к моменту атаки. */
+  /** Телеграфы боссов: показывают ровно ту геометрию, которой будет атака; на исполнении скрыты. */
   private drawTelegraphs(s: SimState, now: number): void {
     const ctx = this.ctx;
     for (const e of s.enemies) {
       const tl = e.tele;
-      if (!tl) continue;
+      if (!tl || e.ai >= 20) continue;
       const k = 1 - tl.t / tl.total;
       const blink = 0.55 + 0.45 * Math.sin(now * 0.03);
       ctx.strokeStyle = '#ff3d6e';
       ctx.fillStyle = '#ff3d6e';
       if (tl.kind === 'ring') {
-        ctx.globalAlpha = 0.3 + 0.5 * k;
+        // кольцо не «раздувается»: стоит на месте, заполняется дугой к моменту залпа
+        ctx.globalAlpha = 0.25;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, tl.r, 0, TAU);
+        ctx.stroke();
+        ctx.globalAlpha = 0.85;
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(e.x, e.y, tl.r + 30 * (1 - k), 0, TAU);
+        ctx.arc(e.x, e.y, tl.r, -Math.PI / 2, -Math.PI / 2 + TAU * k);
         ctx.stroke();
+        this.aimLines(e.x, e.y, tl, k, blink, tl.r);
       } else if (tl.kind === 'circle') {
         ctx.globalAlpha = 0.12 + 0.18 * k;
         ctx.beginPath();
@@ -320,18 +327,52 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(tl.x, tl.y, tl.r * k, 0, TAU);
         ctx.stroke();
-      } else {
-        for (let i = 0; i < tl.count; i++) {
-          const a = tl.a + (i - (tl.count - 1) / 2) * tl.spread;
-          ctx.globalAlpha = (0.2 + 0.6 * k) * blink;
-          ctx.lineWidth = Math.max(2, (tl.r || 3) * 2 * k);
+      } else if (tl.kind === 'corridor') {
+        // коридор рывка: ширина = диаметр босса, от точки старта; заливка бежит к концу, шевроны — направление
+        const w = tl.r;
+        const len = tl.len + tl.r;
+        ctx.save();
+        ctx.translate(tl.x, tl.y);
+        ctx.rotate(tl.a);
+        ctx.globalAlpha = 0.1;
+        ctx.fillRect(0, -w, len, w * 2);
+        ctx.globalAlpha = 0.22;
+        ctx.fillRect(0, -w, len * k, w * 2);
+        ctx.globalAlpha = 0.5 + 0.4 * blink;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 8]);
+        ctx.strokeRect(0, -w, len, w * 2);
+        ctx.setLineDash([]);
+        ctx.lineWidth = 3;
+        for (let x = w + 30; x < len - 10; x += 55) {
+          ctx.globalAlpha = x / len < k ? 0.9 : 0.35;
           ctx.beginPath();
-          ctx.moveTo(e.x, e.y);
-          ctx.lineTo(e.x + Math.cos(a) * tl.len, e.y + Math.sin(a) * tl.len);
+          ctx.moveTo(x - 12, -14);
+          ctx.lineTo(x + 2, 0);
+          ctx.lineTo(x - 12, 14);
           ctx.stroke();
         }
+        ctx.restore();
+      } else {
+        this.aimLines(e.x, e.y, tl, k, blink, 0);
       }
       ctx.globalAlpha = 1;
+    }
+  }
+
+  /** Линии прицела телеграфа: постоянная толщина (по r для лазеров), яркость растёт к выстрелу. */
+  private aimLines(x: number, y: number, tl: { a: number; spread: number; count: number; len: number; r: number }, k: number, blink: number, from: number): void {
+    const ctx = this.ctx;
+    ctx.lineWidth = tl.r > 0 && from === 0 ? tl.r * 2 * (0.35 + 0.65 * k) : 3;
+    for (let i = 0; i < tl.count; i++) {
+      const a = tl.a + (i - (tl.count - 1) / 2) * tl.spread;
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      ctx.globalAlpha = (0.45 + 0.5 * k) * (0.75 + 0.25 * blink);
+      ctx.beginPath();
+      ctx.moveTo(x + c * from, y + sn * from);
+      ctx.lineTo(x + c * tl.len, y + sn * tl.len);
+      ctx.stroke();
     }
   }
 

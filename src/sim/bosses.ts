@@ -23,6 +23,10 @@ const HEART_BY_PHASE: readonly (readonly Pattern[])[] = [
 /** Длительность телеграфа: тяжёлые атаки дольше (скилл game-feel: 0.3–0.5 / 0.8–1.2 с). */
 const WINDUP: Record<Pattern, number> = { volley: 0.5, fan: 0.45, charge: 0.85, spiral: 0.5, ringGap: 0.6, lasers: 1.0, summon: 0.4, slam: 1.0 };
 const EXEC: Record<Pattern, number> = { volley: 0.1, fan: 0.1, charge: 0.55, spiral: 2.4, ringGap: 0.6, lasers: 0.25, summon: 0.1, slam: 0.15 };
+/** Геометрия, общая для телеграфа и исполнения (рисуется то же, что стреляет). */
+export const FAN_SPREAD = 0.25;
+export const VOLLEY_SPREAD = 0.18;
+export const CHARGE_SPEED = 720;
 
 export function heartPhase(e: Enemy): number {
   const f = e.hp / e.maxHp;
@@ -53,16 +57,21 @@ function startTelegraph(s: SimState, e: Enemy, p: Pattern, k: number, aimA: numb
   e.ai = 10 + k;
   e.aiT = w;
   switch (p) {
-    case 'volley': case 'spiral': case 'ringGap': case 'summon':
-      e.tele = tele('ring', e.x, e.y, w, { r: e.r + 40 });
+    case 'volley':
+      // кольцо + 3 прицельные линии: прицельные пули полетят ровно по ним (tl.a, tl.spread)
+      e.tele = tele('ring', e.x, e.y, w, { r: e.r + 40, a: aimA, spread: VOLLEY_SPREAD, count: 3, len: 260 });
+      break;
+    case 'spiral': case 'ringGap': case 'summon':
+      e.tele = tele('ring', e.x, e.y, w, { r: e.r + 40, count: 0 });
       break;
     case 'fan':
-      e.tele = tele('lines', e.x, e.y, w, { a: aimA, spread: 0.5, count: 5, len: 320 });
+      e.tele = tele('lines', e.x, e.y, w, { a: aimA, spread: FAN_SPREAD, count: 5, len: 320 });
       break;
     case 'charge':
       e.vx = Math.cos(aimA);
       e.vy = Math.sin(aimA);
-      e.tele = tele('lines', e.x, e.y, w, { a: aimA, count: 1, len: 720 * EXEC.charge, r: e.r });
+      // коридор постоянной ширины (диаметр босса) от точки старта: где пройдёт рывок
+      e.tele = tele('corridor', e.x, e.y, w, { a: aimA, count: 1, len: CHARGE_SPEED * EXEC.charge, r: e.r });
       break;
     case 'lasers':
       e.tele = tele('lines', e.x, e.y, w, { a: aimA, spread: 0.7, count: 3, len: 1100, r: 14 });
@@ -79,14 +88,13 @@ function execute(s: SimState, e: Enemy, p: Pattern, ev: EventSink): void {
   const tl = e.tele;
   switch (p) {
     case 'volley': {
-      const a = Math.atan2(s.p.y - e.y, s.p.x - e.x);
       for (let i = 0; i < 14; i++) shoot(s, e, (i * TAU) / 14 + e.phase * 0.4, 225 + s.wave * 4, dmg);
-      for (let i = -1; i <= 1; i++) shoot(s, e, a + i * 0.18, 340, dmg * 1.2);
+      if (tl) for (let i = -1; i <= 1; i++) shoot(s, e, tl.a + i * tl.spread, 340, dmg * 1.2);
       ev.push({ t: 'sfx', id: 'bossVolley' });
       break;
     }
     case 'fan':
-      if (tl) for (let i = 0; i < 5; i++) shoot(s, e, tl.a + (i - 2) * 0.25, 380, dmg);
+      if (tl) for (let i = 0; i < 5; i++) shoot(s, e, tl.a + (i - 2) * tl.spread, 380, dmg);
       ev.push({ t: 'sfx', id: 'bossVolley' });
       break;
     case 'ringGap': {
@@ -176,7 +184,8 @@ export function updateBoss(s: SimState, e: Enemy, dt: number, ev: EventSink): vo
   }
   const list = patternList(e);
   e.aiT -= dt;
-  if (e.tele) e.tele.t = Math.max(0, e.aiT);
+  // таймер телеграфа идёт только во время замаха; на исполнении он стоит на 0 (не «перезаполняется»)
+  if (e.tele) e.tele.t = e.ai >= 10 && e.ai < 20 ? Math.max(0, e.aiT) : 0;
 
   if (e.ai === 0) {
     bossMove(s, e, dt, 1);
@@ -200,7 +209,7 @@ export function updateBoss(s: SimState, e: Enemy, dt: number, ev: EventSink): vo
     if (pat === 'charge' && e.type === 'boss') {
       const vx = e.tele ? Math.cos(e.tele.a) : 0;
       const vy = e.tele ? Math.sin(e.tele.a) : 0;
-      move(s, e, vx * 720 * dt, vy * 720 * dt);
+      move(s, e, vx * CHARGE_SPEED * dt, vy * CHARGE_SPEED * dt);
     }
     if (e.type === 'heart') bossMove(s, e, dt, 0.4);
     if (pat === 'spiral') {

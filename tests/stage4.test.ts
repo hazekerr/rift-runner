@@ -123,6 +123,45 @@ describe('боссы', () => {
     expect(sawTele).toBe(true);
     expect(bulletsBeforeTele).toBe(0);
   });
+  it('Страж: пули летят ровно по показанным линиям (веер и прицельный залп)', () => {
+    const { s, ev } = arena(12);
+    s.p.weapons = [];
+    s.p.stats.maxHp = 99999; s.p.hp = 99999;
+    const b = spawnEnemyNow(s, 'boss', s.p.x, s.p.y - 300, null);
+    const angDiff = (x: number, y: number): number => { const d = Math.abs(x - y) % (Math.PI * 2); return Math.min(d, Math.PI * 2 - d); };
+    let checked = 0;
+    for (let i = 0; i < 60 * 12; i++) {
+      const tl = b.tele && b.ai >= 10 && b.ai < 20 && b.tele.count > 0 && b.tele.kind !== 'corridor' ? { ...b.tele } : null;
+      const before = s.bullets.length;
+      step(s, emptyInput(), DT, ev);
+      const fresh = s.bullets.slice(before).filter((x) => !x.friendly);
+      if (!tl || fresh.length === 0) continue;
+      const angles = fresh.map((x) => Math.atan2(x.vy, x.vx));
+      for (let j = 0; j < tl.count; j++) {
+        const want = tl.a + (j - (tl.count - 1) / 2) * tl.spread;
+        expect(Math.min(...angles.map((a) => angDiff(a, want)))).toBeLessThan(1e-6);
+      }
+      if (tl.kind === 'lines') expect(fresh.length).toBe(tl.count);
+      checked++;
+    }
+    expect(checked).toBeGreaterThanOrEqual(2);
+  });
+  it('Страж: коридор рывка — ширина по боссу, не меняется во время рывка', () => {
+    const { s, ev } = arena(13);
+    s.p.weapons = [];
+    s.p.stats.maxHp = 99999; s.p.hp = 99999;
+    const b = spawnEnemyNow(s, 'boss', s.p.x, s.p.y - 300, null);
+    let seen = false;
+    for (let i = 0; i < 60 * 14; i++) {
+      step(s, emptyInput(), DT, ev);
+      if (b.tele?.kind === 'corridor') {
+        seen = true;
+        expect(b.tele.r).toBe(b.r);
+        if (b.ai >= 20) expect(b.tele.t).toBe(0);
+      }
+    }
+    expect(seen).toBe(true);
+  });
   it('Сердце: фазы по HP, в 3-й фазе есть удар по площади', () => {
     const { s, ev } = arena(10);
     s.p.weapons = [];

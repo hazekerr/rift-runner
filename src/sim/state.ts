@@ -64,7 +64,7 @@ export interface Enemy {
 }
 
 export interface Telegraph {
-  kind: 'ring' | 'lines' | 'circle';
+  kind: 'ring' | 'lines' | 'circle' | 'corridor';
   x: number; y: number;
   /** Направление и разброс линий. */
   a: number; spread: number; count: number; len: number;
