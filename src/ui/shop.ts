@@ -1,20 +1,20 @@
 import { iconImg, moduleIconUrl, weaponIconUrl } from './icons';
 import { statDesc, tagDesc } from './explain';
 import type { WeaponTag } from '../content/weapons';
-import { MAX_WEAPONS, estimateDps, weaponById } from '../content/weapons';
-import { moduleById, type EffectDef, type ModuleDef } from '../content/modules';
+import { MAX_WEAPONS, weaponById } from '../content/weapons';
+import { moduleById, type EffectDef, type ModDef, type ModuleDef } from '../content/modules';
 import { RARITY_COLOR, RARITY_PIPS } from '../content/levelups';
 import { STATS, type StatId } from '../content/stats';
-import { TIER_MULT } from '../content/balance';
 import { t, type I18nKey } from '../i18n';
 import { computeStats } from '../sim/stats';
 import { effectScale } from '../sim/effects';
 import { canTakeWeapon, currentReroll, mergePartner, sellValue } from '../sim/shop';
 import { moduleCount, type ShopOffer, type SimState } from '../sim/state';
-import { weaponCooldown, weaponRange } from '../sim/weapons';
+import { weaponRange } from '../sim/weapons';
 import { $, h } from './dom';
 import { TAG_ORDER } from '../content/synergies';
 import { renderStats } from './statspanel';
+import { dpsGain, weaponDps } from '../sim/dps';
 
 export interface ShopActions {
   buy(i: number): void;
@@ -49,6 +49,15 @@ export function effectText(s: SimState, e: EffectDef): string {
   }
 }
 
+/** Строка «≈ +X DPS (+Y%)» для модификаторов, влияющих на урон арсенала; null, если прироста нет. */
+export function dpsGainLine(s: SimState, mods: readonly ModDef[]): HTMLElement | null {
+  if (!s.p.weapons.length) return null;
+  const g = dpsGain(s, mods);
+  if (Math.abs(g.abs) < 0.5) return null;
+  const sign = g.abs > 0 ? '+' : '−';
+  return h('div', g.abs > 0 ? 'line dps-gain' : 'line down', t('shop.dpsGain', { n: `${sign}${Math.round(Math.abs(g.abs))}`, p: `${sign}${Math.round(Math.abs(g.pct))}` }));
+}
+
 /** Строки модуля: статы со знаком и стрелкой + эффект. */
 export function moduleLines(s: SimState, def: ModuleDef): HTMLElement[] {
   const lines: HTMLElement[] = [];
@@ -60,19 +69,12 @@ export function moduleLines(s: SimState, def: ModuleDef): HTMLElement[] {
     lines.push(el);
   }
   if (def.effect) lines.push(h('div', 'line fx', `◈ ${effectText(s, def.effect)}`));
+  const g = dpsGainLine(s, def.mods);
+  if (g) lines.push(g);
   return lines;
 }
 
-export function weaponDps(s: SimState, id: string, tier: number): number {
-  const def = weaponById(id);
-  const st = s.p.stats;
-  const cls = def.dmgClass === 'melee' ? st.meleeDmg : def.dmgClass === 'ranged' ? st.rangedDmg : st.energyDmg;
-  const mult = Math.max(0.1, 1 + (st.damage + cls) / 100) * (1 + (Math.min(100, st.crit) / 100) * 0.5);
-  const inst = { uid: 0, id, tier, cd: 0, aim: 0, flash: 0, x: 0, y: 0 };
-  // Базовая оценка тира I из контента, масштабированная статами, тиром и скорострельностью
-  const speedUp = def.cooldown / weaponCooldown(s, def, inst);
-  return estimateDps(def) * TIER_MULT[tier - 1]! * mult * (def.kind === 'turret' ? 1 : speedUp);
-}
+export { weaponDps };
 
 /** Теги-кнопки: тап показывает объяснение тега прямо в карточке (на телефоне нет наведения). */
 function tagRow(tags: readonly WeaponTag[]): HTMLElement {

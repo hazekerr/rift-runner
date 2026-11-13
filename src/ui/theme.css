@@ -142,3 +142,4 @@ button:focus-visible,[data-nav]:focus-visible,input:focus-visible{outline:2px so
 .weapon{display:flex;align-items:center;gap:8px}.hud-wicon{flex:none}
 @media(max-width:740px){.hud-wicon{display:none}}
 @media(pointer:coarse) and (max-height:500px){.hud-wicon{display:none}}
+.line.dps-gain{color:#ffc163;font-size:12px}.card .dps-gain{margin:2px 0 4px}

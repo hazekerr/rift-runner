@@ -127,7 +127,7 @@ describe('модули и эффекты', () => {
     const ev: SimEvent[] = [];
     const s = startRun(1, ev);
     for (let i = 0; i < 5; i++) addModule(s.p, 'servo');
-    expect(s.p.stats.atkSpeed).toBe(30);
+    expect(s.p.stats.atkSpeed).toBe(60);
     expect(s.p.mods.filter((m) => m.source.id === 'servo')).toHaveLength(5);
   });
   it('агрегация: шансы суммируются с капом, радиус — максимум', () => {

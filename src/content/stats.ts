@@ -36,4 +36,4 @@ export const STATS: Record<StatId, StatMeta> = {
 
 export const BASE_SPEED = 300;
 export const BASE_MAGNET = 90;
-export const CRIT_MULT = 1.5;
+export const CRIT_MULT = 2;

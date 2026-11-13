@@ -8,6 +8,7 @@ import { STATS } from '../content/stats';
 import { ENEMIES } from '../content/enemies';
 import { rerollCost } from '../content/balance';
 import { fmtNum, t, type I18nKey } from '../i18n';
+import { dpsGainLine } from './shop';
 import type { SimState } from '../sim/state';
 import { $, h } from './dom';
 
@@ -25,7 +26,8 @@ export function renderLevelUp(s: SimState, onPick: (i: number) => void, onReroll
     const rar = h('div', 'rar', h('span', '', t(`rarity.${o.rarity}` as I18nKey)), h('span', '', RARITY_PIPS[o.rarity]!));
     rar.style.color = color;
     const icon = iconImg(statIconUrl(o.stat), 44, 'card-icon');
-    const card = h('button', 'card', rar, icon, h('b', '', t(meta.name)), h('span', 'val', fmtStat(o.stat, o.value)), h('p', 'card-desc', statDesc(o.stat)));
+    const gain = dpsGainLine(s, [{ stat: o.stat, flat: o.value }]);
+    const card = h('button', 'card', rar, icon, h('b', '', t(meta.name)), h('span', 'val', fmtStat(o.stat, o.value)), ...(gain ? [gain] : []), h('p', 'card-desc', statDesc(o.stat)));
     card.title = statDesc(o.stat);
     card.style.borderColor = o.rarity ? color : '';
     card.addEventListener('click', () => onPick(i));

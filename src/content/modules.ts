@@ -48,27 +48,28 @@ const m = (id: string, rarity: ModuleDef['rarity'], mods: ModDef[], effect?: Eff
 
 export const MODULES: readonly ModuleDef[] = [
   // ---- СТАНДАРТ ----
-  m('servo', 0, [{ stat: 'atkSpeed', flat: 6 }]),
-  m('plating', 0, [{ stat: 'armor', flat: 1 }]),
-  m('cell', 0, [{ stat: 'maxHp', flat: 6 }]),
-  m('lens', 0, [{ stat: 'crit', flat: 3 }]),
-  m('actuator', 0, [{ stat: 'speed', flat: 4 }]),
-  m('magcoil', 0, [{ stat: 'magnet', flat: 25 }]),
-  m('sifter', 0, [{ stat: 'harvest', flat: 6 }]),
-  m('scope', 0, [{ stat: 'range', flat: 25 }]),
-  m('charger', 0, [{ stat: 'energyDmg', flat: 8 }], undefined, ['energy']),
-  m('barrel', 0, [{ stat: 'rangedDmg', flat: 8 }], undefined, ['ballistic']),
-  m('whetstone', 0, [{ stat: 'meleeDmg', flat: 8 }], undefined, ['melee']),
-  m('chip', 0, [{ stat: 'luck', flat: 8 }]),
-  m('medgel', 0, [{ stat: 'regen', flat: 2 }]),
-  m('leech', 0, [{ stat: 'lifesteal', flat: 2 }]),
+  m('servo', 0, [{ stat: 'atkSpeed', flat: 12 }]),
+  m('plating', 0, [{ stat: 'armor', flat: 2 }]),
+  m('cell', 0, [{ stat: 'maxHp', flat: 12 }]),
+  m('lens', 0, [{ stat: 'crit', flat: 10 }]),
+  m('actuator', 0, [{ stat: 'speed', flat: 7 }]),
+  m('magcoil', 0, [{ stat: 'magnet', flat: 45 }]),
+  m('sifter', 0, [{ stat: 'harvest', flat: 10 }]),
+  m('scope', 0, [{ stat: 'range', flat: 45 }]),
+  m('charger', 0, [{ stat: 'energyDmg', flat: 15 }], undefined, ['energy']),
+  m('barrel', 0, [{ stat: 'rangedDmg', flat: 15 }], undefined, ['ballistic']),
+  m('whetstone', 0, [{ stat: 'meleeDmg', flat: 15 }], undefined, ['melee']),
+  m('chip', 0, [{ stat: 'luck', flat: 12 }]),
+  m('medgel', 0, [{ stat: 'regen', flat: 3 }]),
+  m('leech', 0, [{ stat: 'lifesteal', flat: 3 }]),
+  m('amp', 0, [{ stat: 'damage', flat: 12 }]),
   // ---- УЛУЧШЕННЫЙ ----
-  m('overclock', 1, [{ stat: 'atkSpeed', flat: 12 }, { stat: 'maxHp', flat: -5 }]),
-  m('heavyplate', 1, [{ stat: 'armor', flat: 3 }, { stat: 'speed', flat: -4 }]),
-  m('flicker', 1, [{ stat: 'dodge', flat: 6 }]),
-  m('focus', 1, [{ stat: 'crit', flat: 6 }, { stat: 'atkSpeed', flat: -3 }]),
-  m('longbarrel', 1, [{ stat: 'range', flat: 60 }, { stat: 'atkSpeed', flat: -4 }], undefined, ['ballistic']),
-  m('scrapline', 1, [{ stat: 'harvest', flat: 12 }, { stat: 'damage', flat: -3 }]),
+  m('overclock', 1, [{ stat: 'atkSpeed', flat: 25 }, { stat: 'maxHp', flat: -5 }]),
+  m('heavyplate', 1, [{ stat: 'armor', flat: 4 }, { stat: 'speed', flat: -4 }]),
+  m('flicker', 1, [{ stat: 'dodge', flat: 8 }]),
+  m('focus', 1, [{ stat: 'crit', flat: 18 }, { stat: 'atkSpeed', flat: -3 }]),
+  m('longbarrel', 1, [{ stat: 'range', flat: 80 }, { stat: 'rangedDmg', flat: 8 }], undefined, ['ballistic']),
+  m('scrapline', 1, [{ stat: 'harvest', flat: 18 }, { stat: 'damage', flat: -3 }]),
   m('shockpad', 1, [], { kind: 'dashNova', count: 8, dmg: 10 }, ['energy']),
   m('volatile', 1, [], { kind: 'killExplode', chance: 15, r: 70, dmg: 10 }, ['explosive']),
   m('capacitor', 1, [{ stat: 'energyDmg', flat: 5 }], { kind: 'energyOnKill', amount: 3 }, ['energy']),
@@ -79,7 +80,7 @@ export const MODULES: readonly ModuleDef[] = [
   m('siphon', 1, [], { kind: 'scrapHeal', every: 12 }),
   // ---- ПРОТОТИП ----
   m('rage', 2, [], { kind: 'lowHpDmg', pct: 35, below: 40 }),
-  m('reactor', 2, [{ stat: 'damage', flat: 12 }, { stat: 'armor', flat: -2 }]),
+  m('reactor', 2, [{ stat: 'damage', flat: 35 }, { stat: 'armor', flat: -2 }]),
   m('bulwark', 2, [{ stat: 'maxHp', flat: 20 }, { stat: 'armor', flat: 2 }, { stat: 'speed', flat: -6 }]),
   m('phantom', 2, [{ stat: 'dodge', flat: 12 }, { stat: 'maxHp', flat: -10 }]),
   m('arcprism', 2, [{ stat: 'crit', flat: 3 }], { kind: 'critArc', targets: 2, pct: 50 }, ['energy']),
@@ -104,5 +105,5 @@ export const moduleById = (id: string): ModuleDef => {
 };
 
 /** Базовые цены (× (1 + 0.1·(w−1))): модули по редкости, оружие по тиру. */
-export const MODULE_PRICE = [18, 36, 65, 110] as const;
+export const MODULE_PRICE = [12, 28, 50, 90] as const;
 export const WEAPON_PRICE = [22, 48, 95, 180] as const;

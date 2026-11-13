@@ -133,7 +133,7 @@ export const en: Record<I18nKey, string> = {
   'statdesc.rangedDmg': 'Bonus damage for guns: {list}. Stacks with general damage.',
   'statdesc.energyDmg': 'Bonus damage for energy weapons: {list}. Stacks with general damage.',
   'statdesc.atkSpeed': 'How often weapons fire: +100% means twice as often. Above +100% each point counts half.',
-  'statdesc.crit': 'Chance for a hit to deal ×1.5 damage.',
+  'statdesc.crit': 'Chance for a hit to deal ×2 damage.',
   'statdesc.range': 'Added to every weapon range (half for melee). Weapons auto-fire only at targets within range.',
   'statdesc.armor': 'Reduces incoming damage: 10 armor = −50%, 20 = −67%. Negative armor increases damage.',
   'statdesc.dodge': 'Chance to avoid a hit completely. Above 40% it is half as effective, capped at 60%.',
@@ -181,6 +181,7 @@ export const en: Record<I18nKey, string> = {
   'e.swarm': 'swarm',
   'e.boss': 'Rift Guardian',
 
+  'm.amp': 'Amplifier',
   'm.servo': 'Servo',
   'm.plating': 'Plating',
   'm.cell': 'Power Cell',
@@ -244,6 +245,7 @@ export const en: Record<I18nKey, string> = {
 
   'shop.eyebrow': 'WAVE {w} CLEARED · NEXT {n}',
   'shop.title': 'SUPPLY TERMINAL',
+  'shop.dpsGain': '≈ {n} arsenal DPS ({p}%)',
   'shop.scrap': 'SCRAP',
   'shop.offers': '> SUPPLY // {n} SLOTS',
   'shop.arsenal': '> ARSENAL // {n} / {m}',
