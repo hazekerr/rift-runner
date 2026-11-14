@@ -47,7 +47,7 @@ export const OPERATORS: readonly OperatorDef[] = [
   { id: 'operator', name: 'op.operator', role: 'op.operator.role', rules: ['op.operator.r1'], color: '#62ecd2', glyph: '⬡',
     startWeapons: ['pulse'], mods: [], rule: {}, unlock: { kind: 'none' } },
   { id: 'welder', name: 'op.welder', role: 'op.welder.role', rules: ['op.welder.r1', 'op.welder.r2'], color: '#ffb05e', glyph: '⚒',
-    startWeapons: ['blade'], mods: [{ stat: 'meleeDmg', flat: 15 }, { stat: 'maxHp', flat: 15 }], rule: { onlyTag: 'melee', armoredBonus: 20 },
+    startWeapons: ['blade'], mods: [{ stat: 'meleeDmg', flat: 15 }, { stat: 'maxHp', flat: 15 }], rule: { onlyTag: 'melee', armoredBonus: 10 },
     unlock: { kind: 'wave', n: 5 } },
   { id: 'signal', name: 'op.signal', role: 'op.signal.role', rules: ['op.signal.r1', 'op.signal.r2'], color: '#b4a0ff', glyph: '⌖',
     startWeapons: ['pulse'], mods: [{ stat: 'range', flat: 60 }], rule: { manualOnly: 2 },
@@ -60,8 +60,8 @@ export const OPERATORS: readonly OperatorDef[] = [
     unlock: { kind: 'guardian', n: 1 } },
   // 2.0: ближний бой как отдельный стиль — лечится ударами, держит удар, но только ближнее оружие
   { id: 'butcher', name: 'op.butcher', role: 'op.butcher.role', rules: ['op.butcher.r1', 'op.butcher.r2'], color: '#ff6d8a', glyph: '✖',
-    startWeapons: ['claws'], mods: [{ stat: 'meleeDmg', flat: 10 }, { stat: 'maxHp', flat: 20 }, { stat: 'speed', flat: -5 }],
-    rule: { onlyTag: 'melee', meleeHeal: 2, damageTakenMult: 0.85 },
+    startWeapons: ['claws'], mods: [{ stat: 'meleeDmg', flat: 5 }, { stat: 'maxHp', flat: 20 }, { stat: 'speed', flat: -5 }],
+    rule: { onlyTag: 'melee', meleeHeal: 2, damageTakenMult: 0.9 },
     unlock: { kind: 'wave', n: 10 } },
 ];
 

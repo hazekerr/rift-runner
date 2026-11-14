@@ -232,7 +232,8 @@ export function updateBoss(s: SimState, e: Enemy, dt: number, ev: EventSink): vo
       e.ai = 0;
       e.tele = null;
       e.shot++;
-      e.aiT = (e.type === 'heart' ? 0.9 : 1.3) * (s.overtime ? 0.6 : 1);
+      // 2.0: паузы короче (было 0.9 / 1.3) — босс почти не успевал угрожать
+      e.aiT = (e.type === 'heart' ? 0.7 : 1.0) * (s.overtime ? 0.6 : 1);
     }
   }
 }

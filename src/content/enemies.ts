@@ -45,9 +45,9 @@ export const ENEMIES: Record<EnemyType, EnemyDef> = {
   armadillo: { type: 'armadillo', name: 'e.armadillo', hp: 85, contact: 14, shotDmg: 0, speed: 60, r: 22, scrap: 3, scrapChance: 1, points: 100, color: '#d6a878', sides: 0 },
   phantom: { type: 'phantom', name: 'e.phantom', hp: 40, contact: 14, shotDmg: 0, speed: 95, r: 16, scrap: 2, scrapChance: 1, points: 90, color: '#d6b3ff', sides: 7 },
   crusher: { type: 'crusher', name: 'e.crusher', hp: 450, contact: 18, shotDmg: 9, speed: 80, r: 36, scrap: 25, scrapChance: 1, points: 800, color: '#ff8c3a', sides: 8 },
-  brood: { type: 'brood', name: 'e.brood', hp: 1400, contact: 20, shotDmg: 8, speed: 50, r: 46, scrap: 50, scrapChance: 1, points: 2500, color: '#c7ff5e', sides: 10 },
-  boss: { type: 'boss', name: 'e.boss', hp: 3200, contact: 20, shotDmg: 10, speed: 72, r: 45, scrap: 60, scrapChance: 1, points: 1500, color: '#ff5f78', sides: 8 },
-  heart: { type: 'heart', name: 'e.heart', hp: 9000, contact: 24, shotDmg: 9, speed: 55, r: 58, scrap: 120, scrapChance: 1, points: 5000, color: '#ff3d6e', sides: 12 },
+  brood: { type: 'brood', name: 'e.brood', hp: 2000, contact: 20, shotDmg: 11, speed: 50, r: 46, scrap: 50, scrapChance: 1, points: 2500, color: '#c7ff5e', sides: 10 },
+  boss: { type: 'boss', name: 'e.boss', hp: 5000, contact: 22, shotDmg: 14, speed: 72, r: 45, scrap: 60, scrapChance: 1, points: 1500, color: '#ff5f78', sides: 8 },
+  heart: { type: 'heart', name: 'e.heart', hp: 24000, contact: 26, shotDmg: 13, speed: 55, r: 58, scrap: 120, scrapChance: 1, points: 5000, color: '#ff3d6e', sides: 12 },
 };
 
 /** Боссы: не лечатся хилерами, не добиваются «Палачом», у них своя полоса HP. */
